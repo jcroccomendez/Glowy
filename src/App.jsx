@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Download, Video, Monitor, Smartphone, Layout as ImageIcon } from 'lucide-react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 
-// --- CONFIGURACIÓN Y UTILIDADES ---
-const APP_BG = '#131413'; // Fondo general de la app unificado
+// --- CONFIGURATION AND UTILITIES ---
+const APP_BG = '#131413'; // Unified general app background
 
 // Color Themes
 const THEMES = {
@@ -36,7 +36,7 @@ const FORMATS = {
   desktop: { width: 1920, height: 1080, label: "Desktop", icon: Monitor }
 };
 
-// --- COMPONENTES ---
+// --- COMPONENTS ---
 
 const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v }) => {
   const percentage = ((value - min) / (max - min)) * 100;
@@ -120,14 +120,14 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
 };
 
 
-// --- COMPONENTE PRINCIPAL APP ---
+// --- MAIN APP COMPONENT ---
 export default function App() {
-  // Estado general
+  // General state
   const [format, setFormat] = useState('post');
   const [isAnimated, setIsAnimated] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
 
-  // Estado Modo Clásico
+  // Classic Mode state
   const [direction, setDirection] = useState('left');
   const [dotSize, setDotSize] = useState(1.8);
   const [dotSpacing, setDotSpacing] = useState(28);
@@ -154,7 +154,7 @@ export default function App() {
     }
   };
 
-  // Referencias (Refs)
+  // References (Refs)
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const noiseCanvasRef = useRef(null);
@@ -203,7 +203,7 @@ export default function App() {
     mousePosRef.current = null;
   };
 
-  // Generar patrón de ruido
+  // Generate noise pattern
   useEffect(() => {
     const { width, height } = FORMATS[format];
     const canvas = document.createElement('canvas');
@@ -225,12 +225,12 @@ export default function App() {
     stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme };
   }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme]);
 
-  // Reiniciar la animación de intro al cambiar de tab
+  // Reset intro animation when changing tabs
   useEffect(() => {
     introStartTimeRef.current = -1;
   }, [activeTab]);
 
-  // --- LÓGICA DE DIBUJADO DE SPECTRUM ---
+  // --- SPECTRUM DRAWING LOGIC ---
   const drawSpectrum = (ctx, width, height, time, state, elapsed) => {
     const theme = THEMES[state.colorTheme] || THEMES.neon;
     ctx.fillStyle = theme.bg;
@@ -242,19 +242,19 @@ export default function App() {
     const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
     const baseBlobY = state.gradientPos === 'bottom' ? height + (radius * yOffsetMultiplier) : -(radius * yOffsetMultiplier);
 
-    // El fondo y variables base
+    // Background and base variables
     for (let i = 0; i < numCols; i++) {
       ctx.save();
 
-      // --- EFECTO DOMINÓ (INTRO) ---
-      // Cada columna tiene un retraso basado en su índice de izquierda (0) a derecha (numCols-1)
-      const colDelayMs = i * 120; // 120ms de diferencia entre cada columna
-      const colDurationMs = 800;  // Tiempo que tarda en aparecer cada columna
+      // --- DOMINO EFFECT (INTRO) ---
+      // Each column has a delay based on its index from left (0) to right (numCols-1)
+      const colDelayMs = i * 120; // 120ms difference between each column
+      const colDurationMs = 800;  // Time it takes for each column to appear
 
-      // Progreso de aparición de la columna actual (0 a 1)
+      // Current column appearance progress (0 to 1)
       let rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
 
-      // Ease-in (cuadrático)
+      // Ease-in (quadratic)
       const pColFade = Math.pow(rawColP, 2);
 
       ctx.beginPath();
@@ -283,7 +283,7 @@ export default function App() {
       let blobY = waveY * (1 - interactRef.current.weight) + interactRef.current.y * interactRef.current.weight;
 
       ctx.filter = 'blur(170px)';
-      ctx.globalAlpha = pColFade; // Usamos el fade individual
+      ctx.globalAlpha = pColFade; // Use individual fade
 
       const gradScale = 0.9 + (0.1 * pColFade);
       const scaledRx = rx * gradScale;
@@ -300,16 +300,16 @@ export default function App() {
 
       ctx.restore();
 
-      // --- BORDE PUNTEADO ENTRE COLUMNAS ---
+      // --- DASHED BORDER BETWEEN COLUMNS ---
       if (i < numCols - 1) {
         ctx.save();
-        ctx.globalAlpha = pColFade * 0.5; // Un poco más transparentes
+        ctx.globalAlpha = pColFade * 0.5; // A bit more transparent
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
         const lineGrad = ctx.createLinearGradient(0, 0, 0, height);
         lineGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        lineGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0)'); // La transparencia baja más
+        lineGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0)'); // Transparency goes lower
         lineGrad.addColorStop(1, '#FFFFFF');
 
         ctx.strokeStyle = lineGrad;
@@ -358,7 +358,7 @@ export default function App() {
     }
   };
 
-  // --- LÓGICA DE DIBUJADO DE WAVES (Spectrum deformado) ---
+  // --- WAVES DRAWING LOGIC (Deformed Spectrum) ---
   const drawWaves = (ctx, width, height, time, state, elapsed) => {
     const theme = THEMES[state.colorTheme] || THEMES.neon;
     ctx.fillStyle = theme.bg;
@@ -532,23 +532,23 @@ export default function App() {
     }
   };
 
-  // --- LÓGICA DE DIBUJADO (RENDER LOOP) ---
+  // --- DRAWING LOGIC (RENDER LOOP) ---
   const drawScene = useCallback((ctx, width, height, time, injectedState) => {
     const state = injectedState || stateRef.current;
 
     const mPos = mousePosRef.current;
     if (mPos) {
-      // El peso máximo de atracción ahora es 0.2 (20%), y la velocidad de transición es 0.2 (20%)
+      // The maximum attraction weight is now 0.2 (20%), and the transition speed is 0.2 (20%)
       interactRef.current.weight += (0.2 - interactRef.current.weight) * 0.2;
-      // La velocidad con la que persigue al cursor es 0.2 (20%)
+      // The speed with which it chases the cursor is 0.2 (20%)
       interactRef.current.x += (mPos.x - interactRef.current.x) * 0.2;
       interactRef.current.y += (mPos.y - interactRef.current.y) * 0.2;
     } else {
-      // La velocidad con la que suelta el control al salir es 0.2 (20%)
+      // The speed with which it releases control when leaving is 0.2 (20%)
       interactRef.current.weight += (0 - interactRef.current.weight) * 0.2;
     }
 
-    // --- CONTROL DE INTRO ANIMACIÓN ---
+    // --- INTRO ANIMATION CONTROL ---
     if (formatRef.current !== state.format) {
       introStartTimeRef.current = time;
       formatRef.current = state.format;
@@ -576,14 +576,14 @@ export default function App() {
 
 
 
-    // 1. Fondo base
+    // 1. Base background
     const theme = THEMES[state.colorTheme] || THEMES.neon;
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, width, height);
 
-    // --- MODO CLÁSICO (Puntos y Gradiente Ovalado) ---
+    // --- CLASSIC MODE (Dots and Oval Gradient) ---
 
-    // Parámetros del barrido ralentizados
+    // Slowed sweep parameters
     const WAVE_SPEED = 2000;
     const DOT_ANIM_DURATION = 1400;
     const FADE_OUT_POINT = 0.60; // Los puntos se desvanecen al 60% del canvas
@@ -598,7 +598,7 @@ export default function App() {
         let fadeRatio = 0;
         let sweepRatio = 0;
 
-        // Cálculo de ratios según dirección
+        // Calculation of ratios according to direction
         if (state.direction === 'left') {
           fadeRatio = x / width;
           sweepRatio = (x / width + y / height) / 2;
@@ -630,11 +630,11 @@ export default function App() {
 
         let currentAlpha;
         if (dotP < 0.2) {
-          // Gradiente suave de aparición (evita la línea recta dura)
+          // Smooth appearance gradient (avoids a hard straight line)
           let introP = dotP / 0.2;
           currentAlpha = peakAlpha * introP;
         } else {
-          // Descenso del 27% al 25%
+          // Descent from 27% to 25%
           let restP = (dotP - 0.2) / 0.8;
           let easeP = Math.pow(restP, 2);
           currentAlpha = peakAlpha + (endAlpha - peakAlpha) * easeP;
@@ -649,17 +649,17 @@ export default function App() {
     }
     ctx.globalAlpha = 1.0;
 
-    // Gradiente Ovalado
+    // Oval Gradient
     ctx.save();
     const radius = Math.max(width, height) * 0.6;
-    // Subiendo 10% más
+    // Moving up 10% more
     const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
     let baseBlobX = width / 2;
     let baseBlobY = state.gradientPos === 'bottom' ? height + (radius * yOffsetMultiplier) : -(radius * yOffsetMultiplier);
     let rx = radius;
     let ry = radius;
 
-    // Movimiento orgánico (velocidad aumentada)
+    // Organic movement (increased speed)
     const t = time * 0.0005;
     let animX = 0, animY = 0;
     if (state.isAnimated) {
@@ -675,10 +675,10 @@ export default function App() {
     let blobX = waveX * (1 - interactRef.current.weight) + interactRef.current.x * interactRef.current.weight;
     let blobY = waveY * (1 - interactRef.current.weight) + interactRef.current.y * interactRef.current.weight;
 
-    // Animación Intro del Gradiente
-    // Aparece progresivamente de forma muy suave durante 1200ms
+    // Gradient Intro Animation
+    // Appears progressively very smoothly over 1200ms
     let rawGradP = Math.max(0, Math.min((elapsed - 100) / 1200, 1));
-    const pGradFade = (1 - Math.cos(rawGradP * Math.PI)) / 2; // Ease-in-out para mayor suavidad
+    const pGradFade = (1 - Math.cos(rawGradP * Math.PI)) / 2; // Ease-in-out for greater smoothness
 
     ctx.filter = 'blur(170px)';
     ctx.globalAlpha = pGradFade;
@@ -711,14 +711,14 @@ export default function App() {
         drawWidth *= ratio;
         drawHeight *= ratio;
       }
-      // Aplicar escalado del usuario
+      // Apply user scaling
       drawWidth *= state.imageScale;
       drawHeight *= state.imageScale;
 
       const drawX = (width - drawWidth) / 2;
       const drawY = (height - drawHeight) / 2;
 
-      // Fade-in más rápido para la imagen subida (aparece en 400ms)
+      // Faster fade-in for the uploaded image (appears in 400ms)
       let imgP = Math.max(0, Math.min((elapsed - 300) / 400, 1));
       let pImgFade = Math.pow(imgP, 2);
 
@@ -735,7 +735,7 @@ export default function App() {
     }
   }, []);
 
-  // --- LOOP PRINCIPAL ---
+  // --- MAIN LOOP ---
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -761,7 +761,7 @@ export default function App() {
       }
 
       ctx.clearRect(0, 0, width, height);
-      // Pasamos animatedTime en el state para drawScene
+      // We pass animatedTime in the state for drawScene
       const renderState = { ...stateRef.current, animatedTime: timeStateRef.current.animatedTime };
       drawScene(ctx, width, height, time, renderState);
       animFrame = requestAnimationFrame(loop);
@@ -774,7 +774,7 @@ export default function App() {
     };
   }, [drawScene, format]);
 
-  // --- EXPORTAR SVG ---
+  // --- EXPORT SVG ---
   const handleExportSVG = () => {
     const state = stateRef.current;
     const theme = THEMES[state.colorTheme] || THEMES.neon;
@@ -941,12 +941,12 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `neonplace-${state.format}.svg`;
+    a.download = `neon-theme-creator-${state.format}.svg`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // --- EXPORTAR VIDEO MP4 (Alta Calidad Offline) ---
+  // --- EXPORT MP4 VIDEO (High Quality Offline) ---
   const handleExportVideo = async () => {
     if (isRecording) return;
     setIsRecording(true);
@@ -955,7 +955,7 @@ export default function App() {
 
     const { width, height } = FORMATS[stateRef.current.format];
 
-    // Dar un momento para que React actualice el estado (isRecording = true)
+    // Give React a moment to update the state (isRecording = true)
     await new Promise(resolve => setTimeout(resolve, 50));
 
     try {
@@ -992,7 +992,7 @@ export default function App() {
       const ctx = offscreenCanvas.getContext('2d');
 
       const baseTime = performance.now();
-      // Forzar que la intro de la animación se reinicie para el video
+      // Force the animation intro to restart for the video
       introStartTimeRef.current = baseTime;
 
       for (let i = 0; i < totalFrames; i++) {
@@ -1006,7 +1006,7 @@ export default function App() {
         videoEncoder.encode(videoFrame, { keyFrame });
         videoFrame.close();
 
-        // Pausar un momento para no bloquear la UI completamente
+        // Pause for a moment to not block the UI completely
         if (i % 5 === 0) {
           await new Promise(r => setTimeout(r, 0));
         }
@@ -1020,13 +1020,13 @@ export default function App() {
       let url = URL.createObjectURL(blob);
       let a = document.createElement('a');
       a.href = url;
-      a.download = `neonplace-${stateRef.current.format}.mp4`;
+      a.download = `neon-theme-creator-${stateRef.current.format}.mp4`;
       a.click();
       URL.revokeObjectURL(url);
 
     } catch (e) {
       console.error("Video export failed:", e);
-      alert("Error al exportar video: " + e.message);
+      alert("Video export error: " + e.message);
     } finally {
       setIsRecording(false);
     }
@@ -1042,15 +1042,15 @@ export default function App() {
 
       <div className="flex h-screen w-screen overflow-hidden text-zinc-100" style={{ backgroundColor: APP_BG }}>
 
-        {/* SIDEBAR DE CONTROLES */}
+        {/* CONTROLS SIDEBAR */}
         <div className="w-[320px] flex-shrink-0 bg-[#131413] flex flex-col overflow-y-auto z-10">
 
           <div className="flex flex-col pt-5 px-5">
             <h1 className="text-lg font-extrabold tracking-tight text-white mb-4">
-              Neonplace
+              Neon Theme Creator
             </h1>
 
-            {/* TABS GENERALES */}
+            {/* GENERAL TABS */}
             <div className="flex border-b border-[#2A2A2A] mb-4">
               {[
                 { id: 'neonPattern', label: 'Pattern' },
@@ -1077,7 +1077,7 @@ export default function App() {
 
           <div className="flex flex-col flex-1 px-5">
 
-            {/* FORMATO DEL CANVAS (Presets) */}
+            {/* CANVAS FORMAT (Presets) */}
             <div className="flex flex-col gap-2 mb-4">
               <label className="text-[14px] font-bold text-white mb-1">Presets</label>
               <div className="flex gap-2">
@@ -1132,7 +1132,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* CONTROLES MODO CLASICO */}
+            {/* CLASSIC MODE CONTROLS */}
             {activeTab === 'neonPattern' && (
               <>
                 <div className="bg-[#1E1E20] p-3 rounded-xl mb-3">
@@ -1173,7 +1173,7 @@ export default function App() {
             )}
 
 
-            {/* CONTROL DE ANIMACION Y OTROS SETTINGS (Estilo lista de Switchers) */}
+            {/* ANIMATION CONTROL AND OTHER SETTINGS (Switcher list style) */}
             <div className="bg-[#1E1E20] px-4 py-1.5 rounded-xl mb-3">
               <Switch
                 label="Animate Effect"
@@ -1182,7 +1182,7 @@ export default function App() {
               />
             </div>
 
-            {/* CONTROL PARA SUBIR IMAGEN */}
+            {/* UPLOAD IMAGE CONTROL */}
             <div className="bg-[#1E1E20] p-4 rounded-xl mb-3">
               <div className="mb-4">
                 <label className="text-[14px] font-semibold text-zinc-300 mb-3 block">Upload Logo/Image</label>
@@ -1210,7 +1210,7 @@ export default function App() {
 
           </div>
 
-          {/* ACCIONES DE EXPORTACIÓN */}
+          {/* EXPORT ACTIONS */}
           <div className="flex flex-col gap-2 p-5 bg-[#131413]">
             <button
               onClick={handleExportSVG}
@@ -1243,7 +1243,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* ÁREA DE RENDERIZADO DEL CANVAS */}
+        {/* CANVAS RENDERING AREA */}
         {/* CANVAS PREVIEW */}
         <div
           className="flex-1 relative flex flex-col p-8 items-center justify-center bg-[#131413] overflow-hidden"
