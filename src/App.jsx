@@ -41,10 +41,10 @@ const FORMATS = {
 const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v }) => {
   const percentage = ((value - min) / (max - min)) * 100;
   return (
-    <div className="flex flex-col gap-2 mb-4 last:mb-0">
+    <div className="flex flex-col gap-1 mb-1 last:mb-0">
       <div className="flex justify-between items-center">
-        <label className="text-[13px] font-medium text-zinc-400">{label}</label>
-        <span className="text-[13px] text-zinc-500 font-mono">{formatValue(value)}</span>
+        <label className="text-[11px] font-medium text-white">{label}</label>
+        <span className="text-[11px] text-[#666] font-mono tabular-nums">{formatValue(value)}</span>
       </div>
       <input
         type="range"
@@ -53,9 +53,9 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full h-[3px] rounded-full appearance-none cursor-pointer focus:outline-none"
+        className="w-full h-[2px] rounded-full appearance-none cursor-pointer focus:outline-none"
         style={{
-          background: `linear-gradient(to right, #00FF48 0%, #00FF48 ${percentage}%, #333333 ${percentage}%, #333333 100%)`
+          background: `linear-gradient(to right, #00FF48 0%, #00FF48 ${percentage}%, #333 ${percentage}%, #333 100%)`
         }}
       />
     </div>
@@ -63,20 +63,20 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
 };
 
 const Switch = ({ label, checked, onChange, icon }) => (
-  <div className="flex items-center justify-between py-3">
-    <div className="flex items-center gap-3">
-      {icon && <span className="text-zinc-400">{icon}</span>}
-      <label className="text-[14px] font-semibold text-zinc-300 cursor-pointer" onClick={() => onChange(!checked)}>
+  <div className="flex items-center justify-between py-1.5">
+    <div className="flex items-center gap-2">
+      {icon && <span className="text-[#666]">{icon}</span>}
+      <label className="text-[12px] font-medium text-white cursor-pointer" onClick={() => onChange(!checked)}>
         {label}
       </label>
     </div>
     <button
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-[24px] w-12 items-center rounded-full transition-colors focus:outline-none ${checked ? 'bg-[#00FF48]' : 'bg-[#333]'
+      className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors focus:outline-none ${checked ? 'bg-[#00FF48]' : 'bg-[#333]'
         }`}
     >
       <span
-        className={`inline-block h-[20px] w-[20px] transform rounded-full transition-transform shadow-sm ${checked ? 'translate-x-6 bg-[#131413]' : 'translate-x-0.5 bg-zinc-300'
+        className={`inline-block h-[14px] w-[14px] transform rounded-full transition-transform shadow-sm ${checked ? 'translate-x-[18px] bg-[#181818]' : 'translate-x-0.5 bg-[#666]'
           }`}
       />
     </button>
@@ -89,25 +89,25 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
     const isActive = direction === dir;
     const base = `absolute transition-colors ${isDisabled ? 'opacity-10 cursor-not-allowed' : 'cursor-pointer'}`;
 
-    const activeColor = "bg-gradient-to-r from-[#6ce482] to-[#dcf575]";
-    const inactiveColor = "bg-[#14322f] hover:bg-[#1a403b]";
+    const activeColor = "bg-[#00FF48]";
+    const inactiveColor = "bg-[#333] hover:bg-[#444]";
 
     let shape = "";
-    if (dir === 'top') shape = "w-2 h-5 top-2 left-1/2 -translate-x-1/2 rounded-full";
-    if (dir === 'bottom') shape = "w-2 h-5 bottom-2 left-1/2 -translate-x-1/2 rounded-full";
-    if (dir === 'left') shape = "w-5 h-2 left-2 top-1/2 -translate-y-1/2 rounded-full";
-    if (dir === 'right') shape = "w-5 h-2 right-2 top-1/2 -translate-y-1/2 rounded-full";
+    if (dir === 'top') shape = "w-1.5 h-4 top-1.5 left-1/2 -translate-x-1/2 rounded-full";
+    if (dir === 'bottom') shape = "w-1.5 h-4 bottom-1.5 left-1/2 -translate-x-1/2 rounded-full";
+    if (dir === 'left') shape = "w-4 h-1.5 left-1.5 top-1/2 -translate-y-1/2 rounded-full";
+    if (dir === 'right') shape = "w-4 h-1.5 right-1.5 top-1/2 -translate-y-1/2 rounded-full";
 
     return `${base} ${shape} ${isActive ? activeColor : inactiveColor}`;
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <label className="text-sm font-medium text-zinc-300">{label}</label>
-      <div className="relative w-32 h-20 bg-[#061715] rounded-3xl border border-white/5 flex items-center justify-center shadow-inner mx-auto">
-        <div className="relative w-6 h-6 pointer-events-none opacity-40">
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-zinc-400 -translate-y-1/2 rounded-full"></div>
-          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-zinc-400 -translate-x-1/2 rounded-full"></div>
+    <div className="flex items-center justify-between">
+      <label className="text-[11px] font-medium text-white">{label}</label>
+      <div className="relative w-24 h-14 bg-[#222] rounded-xl flex items-center justify-center">
+        <div className="relative w-4 h-4 pointer-events-none opacity-30">
+          <div className="absolute top-1/2 left-0 w-full h-px bg-[#666] -translate-y-1/2"></div>
+          <div className="absolute left-1/2 top-0 w-px h-full bg-[#666] -translate-x-1/2"></div>
         </div>
 
         <div onClick={() => !disabledDirs.includes('top') && onChange('top')} className={getPillClass('top')} />
@@ -1043,88 +1043,91 @@ export default function App() {
       <div className="flex h-screen w-screen overflow-hidden text-zinc-100" style={{ backgroundColor: APP_BG }}>
 
         {/* CONTROLS SIDEBAR */}
-        <div className="w-[320px] flex-shrink-0 bg-[#131413] flex flex-col overflow-y-auto z-10">
+        <div className="flex-shrink-0 p-3 flex">
+          <div className="w-[280px] bg-[#181818] flex flex-col overflow-y-auto z-10 rounded-2xl">
 
-          <div className="flex flex-col pt-5 px-5">
-            <h1 className="text-lg font-extrabold tracking-tight text-white mb-4">
+          {/* HEADER */}
+          <div className="px-4 pt-4 pb-3">
+            <h1 className="text-[14px] font-bold tracking-tight text-white">
               Neon Theme Creator
             </h1>
-
-            {/* GENERAL TABS */}
-            <div className="flex border-b border-[#2A2A2A] mb-4">
-              {[
-                { id: 'neonPattern', label: 'Pattern' },
-                { id: 'spectrum', label: 'Spectrum' },
-                { id: 'radial', label: 'Waves' }
-              ].map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 pb-3 text-[13px] font-semibold transition-all relative ${isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-                      }`}
-                  >
-                    {tab.label}
-                    {isActive && (
-                      <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#00FF48] rounded-t-full" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
-          <div className="flex flex-col flex-1 px-5">
+          {/* GENERAL TABS */}
+          <div className="flex">
+            {[
+              { id: 'neonPattern', label: 'Pattern' },
+              { id: 'spectrum', label: 'Spectrum' },
+              { id: 'radial', label: 'Waves' }
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 py-2 text-[11px] font-semibold transition-all relative ${isActive ? 'text-white' : 'text-[#666] hover:text-[#999]'
+                    }`}
+                >
+                  {tab.label}
+                  {isActive && (
+                    <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#00FF48]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-            {/* CANVAS FORMAT (Presets) */}
-            <div className="flex flex-col gap-2 mb-4">
-              <label className="text-[14px] font-bold text-white mb-1">Presets</label>
-              <div className="flex gap-2">
+          {/* SCROLLABLE CONTROLS */}
+          <div className="flex flex-col flex-1 overflow-y-auto px-3 pt-2 gap-2">
+
+            {/* PRESETS SECTION */}
+            <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+              <label className="text-[11px] font-semibold text-white mb-2 block">Presets</label>
+              <div className="flex gap-1">
                 {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
                   const isActive = format === key;
                   return (
                     <button
                       key={key}
                       onClick={() => setFormat(key)}
-                      className={`flex-1 flex flex-col items-center justify-center py-2 rounded-lg transition-all min-w-[60px] ${isActive
-                        ? 'bg-[#00FF48]/15'
-                        : 'bg-[#1E1E20] hover:bg-[#2A2A2A]'
+                      className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-all border ${isActive
+                        ? 'bg-[#00FF48]/8 border-[#00FF48]/40 text-[#00FF48]'
+                        : 'bg-transparent border-[#333] text-[#666] hover:border-[#444] hover:text-[#999]'
                         }`}
                     >
-                      <Icon className={`w-6 h-6 mb-2 ${isActive ? 'text-[#00FF48]' : 'text-zinc-400'}`} />
-                      <span className={`text-[11px] font-medium ${isActive ? 'text-[#00FF48]' : 'text-zinc-400'}`}>{label}</span>
+                      <Icon className={`w-5 h-5 mb-1 ${isActive ? 'text-[#00FF48]' : ''}`} />
+                      <span className="text-[11px] font-medium">{label}</span>
                     </button>
                   )
                 })}
               </div>
             </div>
 
-            {/* COLOR THEME SELECTOR */}
-            <div className="bg-[#1E1E20] p-4 rounded-xl mb-3">
-              <label className="text-[14px] font-bold text-white mb-3 block">Color Theme</label>
-              <div className="flex gap-2">
+            {/* COLOR THEME SECTION */}
+            <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+              <label className="text-[11px] font-semibold text-white mb-2 block">Color Theme</label>
+              <div className="flex gap-1">
                 {Object.entries(THEMES).map(([key, t]) => {
                   const isActive = colorTheme === key;
                   return (
                     <button
                       key={key}
                       onClick={() => setColorTheme(key)}
-                      className={`flex-1 flex flex-col items-center gap-2 py-2.5 px-2 rounded-lg transition-all ${isActive
-                        ? 'bg-white/10 ring-1 ring-white/20'
-                        : 'bg-[#131413] hover:bg-[#1a1a1c]'
+                      className={`flex-1 flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-lg transition-all border ${isActive
+                        ? 'bg-[#00FF48]/8 border-[#00FF48]/40'
+                        : 'bg-transparent border-[#333] hover:border-[#444]'
                         }`}
                     >
-                      <div className="flex gap-[3px]">
+                      <div className="flex gap-[2px]">
                         {t.preview.map((c, i) => (
                           <div
                             key={i}
-                            className="w-3.5 h-3.5 rounded-full"
-                            style={{ backgroundColor: c, boxShadow: isActive ? `0 0 6px ${c}80` : 'none' }}
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: c, boxShadow: isActive ? `0 0 4px ${c}60` : 'none' }}
                           />
                         ))}
                       </div>
-                      <span className={`text-[11px] font-medium ${isActive ? 'text-white' : 'text-zinc-500'
+                      <span className={`text-[11px] font-medium ${isActive ? 'text-white' : 'text-[#666]'
                         }`}>{t.label}</span>
                     </button>
                   );
@@ -1135,25 +1138,25 @@ export default function App() {
             {/* CLASSIC MODE CONTROLS */}
             {activeTab === 'neonPattern' && (
               <>
-                <div className="bg-[#1E1E20] p-3 rounded-xl mb-3">
+                <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
                   <DirectionPad
-                    label="Dot Fade Direction"
+                    label="Dot Direction"
                     direction={direction}
                     onChange={setDirection}
                   />
                 </div>
 
-                <div className="bg-[#1E1E20] p-4 rounded-xl mb-3">
+                <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
                   <Slider
-                    label="Dot Thickness"
+                    label="Thickness"
                     min={0.5} max={5} step={0.1}
                     value={dotSize}
                     onChange={setDotSize}
                     formatValue={(v) => v.toFixed(1) + 'px'}
                   />
-                  <div className="my-4"></div>
+                  <div className="h-1.5"></div>
                   <Slider
-                    label="Dot Density"
+                    label="Density"
                     min={10} max={60} step={2}
                     value={dotSpacing}
                     onChange={setDotSpacing}
@@ -1161,9 +1164,9 @@ export default function App() {
                   />
                 </div>
 
-                <div className="bg-[#1E1E20] p-3 rounded-xl mb-3">
+                <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
                   <DirectionPad
-                    label="Gradient Position"
+                    label="Gradient Pos"
                     direction={gradientPos}
                     onChange={setGradientPos}
                     disabledDirs={['left', 'right']}
@@ -1172,9 +1175,8 @@ export default function App() {
               </>
             )}
 
-
-            {/* ANIMATION CONTROL AND OTHER SETTINGS (Switcher list style) */}
-            <div className="bg-[#1E1E20] px-4 py-1.5 rounded-xl mb-3">
+            {/* ANIMATION TOGGLE */}
+            <div className="bg-[#1e1e1e] rounded-xl px-3 py-1">
               <Switch
                 label="Animate Effect"
                 checked={isAnimated}
@@ -1182,21 +1184,19 @@ export default function App() {
               />
             </div>
 
-            {/* UPLOAD IMAGE CONTROL */}
-            <div className="bg-[#1E1E20] p-4 rounded-xl mb-3">
-              <div className="mb-4">
-                <label className="text-[14px] font-semibold text-zinc-300 mb-3 block">Upload Logo/Image</label>
-                <input
-                  type="file"
-                  accept="image/*,.svg"
-                  onChange={handleImageUpload}
-                  className="w-full text-[12px] text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-[12px] file:font-bold file:bg-[#2A2A2A] file:text-[#00FF48] hover:file:bg-[#333] cursor-pointer"
-                />
-              </div>
+            {/* UPLOAD IMAGE */}
+            <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+              <label className="text-[11px] font-semibold text-white mb-2 block">Upload Logo</label>
+              <input
+                type="file"
+                accept="image/*,.svg"
+                onChange={handleImageUpload}
+                className="w-full text-[11px] text-[#666] file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[11px] file:font-medium file:bg-[#282828] file:text-[#999] hover:file:bg-[#2e2e2e] cursor-pointer"
+              />
 
               {uploadedImageObj && (
                 <>
-                  <div className="my-4 h-[1px] bg-[#2A2A2A]" />
+                  <div className="my-2 h-px bg-[#333]" />
                   <Slider
                     label="Image Scale"
                     min={0.1} max={3} step={0.1}
@@ -1211,35 +1211,36 @@ export default function App() {
           </div>
 
           {/* EXPORT ACTIONS */}
-          <div className="flex flex-col gap-2 p-5 bg-[#131413]">
+          <div className="flex flex-col gap-1.5 px-3 pb-3">
             <button
               onClick={handleExportSVG}
               disabled={isRecording}
-              className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-[#1E1E20] hover:bg-[#2A2A2A] text-white rounded-lg transition-colors font-semibold text-[13px] disabled:opacity-50"
+              className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-xl transition-colors font-medium text-[12px] disabled:opacity-50"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               Export SVG
             </button>
             <button
               onClick={handleExportVideo}
               disabled={isRecording}
-              className={`flex items-center justify-center gap-2 w-full py-3 px-4 rounded-lg transition-all font-bold text-[13px] disabled:cursor-not-allowed shadow-md ${isRecording
-                ? 'bg-red-500/20 text-red-400 border border-red-500/50'
-                : 'bg-[#00FF48] text-[#131413] hover:opacity-90'
+              className={`flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl transition-all font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
+                ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
                 }`}
             >
               {isRecording ? (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                   Recording...
                 </>
               ) : (
                 <>
-                  <Video className="w-4 h-4" />
+                  <Video className="w-3.5 h-3.5" />
                   Export Video (MP4)
                 </>
               )}
             </button>
+          </div>
           </div>
         </div>
 
