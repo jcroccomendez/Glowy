@@ -1160,12 +1160,12 @@ export default function App() {
                     <button
                       key={key}
                       onClick={() => setFormat(key)}
-                      className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-all border ${isActive
-                        ? 'bg-[#00FF48]/8 border-[#00FF48]/40 text-[#00FF48]'
-                        : 'bg-transparent border-[#333] text-[#666] hover:border-[#444] hover:text-[#999]'
+                      className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-colors ${isActive
+                        ? 'bg-[#2a2a2a] text-white'
+                        : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
                         }`}
                     >
-                      <Icon className={`w-5 h-5 mb-1 ${isActive ? 'text-[#00FF48]' : ''}`} />
+                      <Icon className="w-5 h-5 mb-1" />
                       <span className="text-[11px] font-medium">{label}</span>
                     </button>
                   )
@@ -1183,21 +1183,24 @@ export default function App() {
                     <button
                       key={key}
                       onClick={() => setColorTheme(key)}
-                      className={`flex-1 flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-lg transition-all border ${isActive
-                        ? 'bg-[#00FF48]/8 border-[#00FF48]/40'
-                        : 'bg-transparent border-[#333] hover:border-[#444]'
+                      className={`flex-1 flex flex-col items-center justify-center gap-2 px-1 rounded-lg transition-colors h-[64px] ${isActive
+                        ? 'bg-[#2a2a2a]'
+                        : 'bg-transparent hover:bg-[#252525]'
                         }`}
                     >
-                      <div className="flex gap-[2px]">
+                      <div className="flex justify-center gap-[2px]">
                         {t.preview.map((c, i) => (
                           <div
                             key={i}
                             className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: c, boxShadow: isActive ? `0 0 4px ${c}60` : 'none' }}
+                            style={{
+                              backgroundColor: c,
+                              boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 4px ${c}60` : ''}`,
+                            }}
                           />
                         ))}
                       </div>
-                      <span className={`text-[11px] font-medium ${isActive ? 'text-white' : 'text-[#666]'
+                      <span className={`text-[11px] font-medium text-center leading-none ${isActive ? 'text-white' : 'text-[#666]'
                         }`}>{t.label}</span>
                     </button>
                   );
