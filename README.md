@@ -15,12 +15,47 @@ A browser-based generator for animated neon backgrounds. Compose a gradient back
 
 React 19 · Vite · Tailwind · Canvas 2D · WebCodecs
 
-## Getting started
+## How to Install
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) 18 or newer (`node -v` to check)
+- npm 9+ (ships with Node)
+- Git
+
+### Steps
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/your-username/neoncreator.git
+   cd neoncreator
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+3. **Start the dev server**
+
+   ```bash
+   npm run dev
+   ```
+
+4. **Open the app**
+
+   Visit the URL printed by Vite (usually `http://localhost:5173`).
+
+### Build for production
 
 ```bash
-npm install
-npm run dev
+npm run build      # outputs to dist/
+npm run preview    # serves the build locally
 ```
+
+### Scripts
 
 | Command | |
 | --- | --- |
