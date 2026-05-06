@@ -165,6 +165,8 @@ export default function App() {
   const interactRef = useRef({ x: 0, y: 0, weight: 0 });
   const timeStateRef = useRef({ lastTime: performance.now(), animatedTime: 1000 });
   const liquidCanvasRef = useRef(null);
+  const blurOffscreenRef = useRef(null);
+  const dotsCacheRef = useRef(null);
 
   const handleMouseMove = (e) => {
     const canvas = canvasRef.current;
@@ -203,7 +205,7 @@ export default function App() {
     mousePosRef.current = null;
   };
 
-  // Generate noise pattern
+  // Generate noise pattern + allocate blur offscreen + invalidate dots cache
   useEffect(() => {
     const { width, height } = FORMATS[format];
     const canvas = document.createElement('canvas');
@@ -218,6 +220,21 @@ export default function App() {
     }
     ctx.putImageData(imgData, 0, 0);
     noiseCanvasRef.current = canvas;
+
+    // Pre-allocate blur offscreen at 1/4 resolution.
+    // ctx.filter = 'blur(170px)' on 1080x1350 ≈ 248M ops; on 270x337 ≈ 3.9M ops (~63x faster).
+    // The drawImage upscale provides bilinear smoothing imperceptible against a 170px blur.
+    const DOWNSCALE = 4;
+    const blurCanvas = document.createElement('canvas');
+    blurCanvas.width = Math.ceil(width / DOWNSCALE);
+    blurCanvas.height = Math.ceil(height / DOWNSCALE);
+    blurOffscreenRef.current = {
+      canvas: blurCanvas,
+      ctx: blurCanvas.getContext('2d'),
+      scale: 1 / DOWNSCALE,
+    };
+
+    dotsCacheRef.current = null;
   }, [format]);
 
   const stateRef = useRef({ direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme });
@@ -229,6 +246,35 @@ export default function App() {
   useEffect(() => {
     introStartTimeRef.current = -1;
   }, [activeTab]);
+
+  // Render a heavily-blurred gradient ellipse via downscale-blur-upscale.
+  // The destination ctx draws an offscreen 1/4-size pre-blurred canvas instead
+  // of running ctx.filter='blur(170px)' on the full-resolution canvas.
+  const drawBlurredGradientEllipse = (ctx, mainW, mainH, cx, cy, rx, ry, gradStart, gradEnd, alpha) => {
+    const off = blurOffscreenRef.current;
+    if (!off) return;
+    const { canvas, ctx: offCtx, scale: s } = off;
+
+    offCtx.clearRect(0, 0, canvas.width, canvas.height);
+    offCtx.filter = `blur(${170 * s}px)`;
+
+    const gradient = offCtx.createLinearGradient(
+      (cx - rx) * s, cy * s,
+      (cx + rx) * s, cy * s
+    );
+    gradient.addColorStop(0.1529, gradStart);
+    gradient.addColorStop(0.8046, gradEnd);
+
+    offCtx.fillStyle = gradient;
+    offCtx.beginPath();
+    offCtx.ellipse(cx * s, cy * s, rx * s, ry * s, 0, 0, Math.PI * 2);
+    offCtx.fill();
+    offCtx.filter = 'none';
+
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, mainW, mainH);
+    ctx.globalAlpha = 1;
+  };
 
   // --- SPECTRUM DRAWING LOGIC ---
   const drawSpectrum = (ctx, width, height, time, state, elapsed) => {
@@ -282,21 +328,11 @@ export default function App() {
       let blobX = waveX * (1 - interactRef.current.weight) + interactRef.current.x * interactRef.current.weight;
       let blobY = waveY * (1 - interactRef.current.weight) + interactRef.current.y * interactRef.current.weight;
 
-      ctx.filter = 'blur(170px)';
-      ctx.globalAlpha = pColFade; // Use individual fade
-
       const gradScale = 0.9 + (0.1 * pColFade);
       const scaledRx = rx * gradScale;
       const scaledRy = ry * gradScale;
 
-      const gradient = ctx.createLinearGradient(blobX - scaledRx, blobY, blobX + scaledRx, blobY);
-      gradient.addColorStop(0.1529, theme.gradientStart);
-      gradient.addColorStop(0.8046, theme.gradientEnd);
-
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.ellipse(blobX, blobY, scaledRx, scaledRy, 0, 0, Math.PI * 2);
-      ctx.fill();
+      drawBlurredGradientEllipse(ctx, width, height, blobX, blobY, scaledRx, scaledRy, theme.gradientStart, theme.gradientEnd, pColFade);
 
       ctx.restore();
 
@@ -453,21 +489,11 @@ export default function App() {
       let blobX = waveX * (1 - interactRef.current.weight) + interactRef.current.x * interactRef.current.weight;
       let blobY = waveY * (1 - interactRef.current.weight) + interactRef.current.y * interactRef.current.weight;
 
-      ctx.filter = 'blur(170px)';
-      ctx.globalAlpha = pColFade;
-
       const gradScale = 0.9 + (0.1 * pColFade);
       const scaledRx = rx * gradScale;
       const scaledRy = ry * gradScale;
 
-      const gradient = ctx.createLinearGradient(blobX - scaledRx, blobY, blobX + scaledRx, blobY);
-      gradient.addColorStop(0.1529, theme.gradientStart);
-      gradient.addColorStop(0.8046, theme.gradientEnd);
-
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.ellipse(blobX, blobY, scaledRx, scaledRy, 0, 0, Math.PI * 2);
-      ctx.fill();
+      drawBlurredGradientEllipse(ctx, width, height, blobX, blobY, scaledRx, scaledRy, theme.gradientStart, theme.gradientEnd, pColFade);
 
       ctx.restore();
 
@@ -593,61 +619,93 @@ export default function App() {
     const startX = (width - (cols * state.dotSpacing)) / 2;
     const startY = (height - (rows * state.dotSpacing)) / 2;
 
-    for (let x = startX; x <= width - startX + 0.1; x += state.dotSpacing) {
-      for (let y = startY; y <= height - startY + 0.1; y += state.dotSpacing) {
-        let fadeRatio = 0;
-        let sweepRatio = 0;
+    // After the intro sweep finishes, the dot grid is fully static. Cache it
+    // to a single offscreen canvas and replace ~1800 arc/fill calls per frame
+    // with one drawImage. The cache key invalidates if any input changes.
+    const introSweepDoneAt = WAVE_SPEED + DOT_ANIM_DURATION; // 3400ms
+    if (elapsed >= introSweepDoneAt) {
+      const cacheKey = `${state.direction}|${state.dotSize}|${state.dotSpacing}|${width}x${height}`;
+      let cached = dotsCacheRef.current;
+      if (!cached || cached.key !== cacheKey) {
+        const off = document.createElement('canvas');
+        off.width = width;
+        off.height = height;
+        const offCtx = off.getContext('2d');
+        offCtx.fillStyle = '#FFFFFF';
 
-        // Calculation of ratios according to direction
-        if (state.direction === 'left') {
-          fadeRatio = x / width;
-          sweepRatio = (x / width + y / height) / 2;
-        } else if (state.direction === 'right') {
-          fadeRatio = 1 - (x / width);
-          sweepRatio = ((1 - x / width) + (1 - y / height)) / 2;
-        } else if (state.direction === 'top') {
-          fadeRatio = y / height;
-          sweepRatio = ((1 - x / width) + y / height) / 2;
-        } else if (state.direction === 'bottom') {
-          fadeRatio = 1 - (y / height);
-          sweepRatio = (x / width + (1 - y / height)) / 2;
+        for (let x = startX; x <= width - startX + 0.1; x += state.dotSpacing) {
+          for (let y = startY; y <= height - startY + 0.1; y += state.dotSpacing) {
+            let fadeRatio = 0;
+            if (state.direction === 'left') fadeRatio = x / width;
+            else if (state.direction === 'right') fadeRatio = 1 - (x / width);
+            else if (state.direction === 'top') fadeRatio = y / height;
+            else if (state.direction === 'bottom') fadeRatio = 1 - (y / height);
+
+            const opacityRatio = fadeRatio < FADE_OUT_POINT ? 1 - (fadeRatio / FADE_OUT_POINT) : 0;
+            const targetOpacityBase = Math.pow(opacityRatio, 1.5);
+            if (targetOpacityBase <= 0.001) continue;
+
+            offCtx.globalAlpha = 0.25 * targetOpacityBase;
+            offCtx.beginPath();
+            offCtx.arc(x, y, state.dotSize, 0, Math.PI * 2);
+            offCtx.fill();
+          }
         }
 
-        let opacityRatio = fadeRatio < FADE_OUT_POINT ? 1 - (fadeRatio / FADE_OUT_POINT) : 0;
-        let targetOpacityBase = Math.pow(opacityRatio, 1.5);
-        if (targetOpacityBase <= 0.001) continue;
-
-        const dotDelay = sweepRatio * WAVE_SPEED;
-        let dotElapsed = elapsed - dotDelay;
-
-        if (dotElapsed < 0) continue;
-
-        let dotP = Math.min(dotElapsed / DOT_ANIM_DURATION, 1);
-        let flashIntensity = Math.pow(opacityRatio, 0.5);
-
-        const peakAlpha = 0.27 * flashIntensity;
-        const endAlpha = 0.25 * targetOpacityBase;
-
-        let currentAlpha;
-        if (dotP < 0.2) {
-          // Smooth appearance gradient (avoids a hard straight line)
-          let introP = dotP / 0.2;
-          currentAlpha = peakAlpha * introP;
-        } else {
-          // Descent from 27% to 25%
-          let restP = (dotP - 0.2) / 0.8;
-          let easeP = Math.pow(restP, 2);
-          currentAlpha = peakAlpha + (endAlpha - peakAlpha) * easeP;
-        }
-
-        ctx.globalAlpha = currentAlpha;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(x, y, state.dotSize, 0, Math.PI * 2);
-        ctx.fill();
+        cached = { key: cacheKey, canvas: off };
+        dotsCacheRef.current = cached;
       }
+      ctx.drawImage(cached.canvas, 0, 0);
+    } else {
+      for (let x = startX; x <= width - startX + 0.1; x += state.dotSpacing) {
+        for (let y = startY; y <= height - startY + 0.1; y += state.dotSpacing) {
+          let fadeRatio = 0;
+          let sweepRatio = 0;
+
+          if (state.direction === 'left') {
+            fadeRatio = x / width;
+            sweepRatio = (x / width + y / height) / 2;
+          } else if (state.direction === 'right') {
+            fadeRatio = 1 - (x / width);
+            sweepRatio = ((1 - x / width) + (1 - y / height)) / 2;
+          } else if (state.direction === 'top') {
+            fadeRatio = y / height;
+            sweepRatio = ((1 - x / width) + y / height) / 2;
+          } else if (state.direction === 'bottom') {
+            fadeRatio = 1 - (y / height);
+            sweepRatio = (x / width + (1 - y / height)) / 2;
+          }
+
+          const opacityRatio = fadeRatio < FADE_OUT_POINT ? 1 - (fadeRatio / FADE_OUT_POINT) : 0;
+          const targetOpacityBase = Math.pow(opacityRatio, 1.5);
+          if (targetOpacityBase <= 0.001) continue;
+
+          const dotDelay = sweepRatio * WAVE_SPEED;
+          const dotElapsed = elapsed - dotDelay;
+          if (dotElapsed < 0) continue;
+
+          const dotP = Math.min(dotElapsed / DOT_ANIM_DURATION, 1);
+          const flashIntensity = Math.pow(opacityRatio, 0.5);
+          const peakAlpha = 0.27 * flashIntensity;
+          const endAlpha = 0.25 * targetOpacityBase;
+
+          let currentAlpha;
+          if (dotP < 0.2) {
+            currentAlpha = peakAlpha * (dotP / 0.2);
+          } else {
+            const easeP = Math.pow((dotP - 0.2) / 0.8, 2);
+            currentAlpha = peakAlpha + (endAlpha - peakAlpha) * easeP;
+          }
+
+          ctx.globalAlpha = currentAlpha;
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(x, y, state.dotSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1.0;
     }
-    ctx.globalAlpha = 1.0;
 
     // Oval Gradient
     ctx.save();
@@ -680,21 +738,11 @@ export default function App() {
     let rawGradP = Math.max(0, Math.min((elapsed - 100) / 1200, 1));
     const pGradFade = (1 - Math.cos(rawGradP * Math.PI)) / 2; // Ease-in-out for greater smoothness
 
-    ctx.filter = 'blur(170px)';
-    ctx.globalAlpha = pGradFade;
-
     const gradScale = 0.9 + (0.1 * pGradFade);
     const scaledRx = rx * gradScale;
     const scaledRy = ry * gradScale;
 
-    const gradient = ctx.createLinearGradient(blobX - scaledRx, blobY, blobX + scaledRx, blobY);
-    gradient.addColorStop(0.1529, theme.gradientStart);
-    gradient.addColorStop(0.8046, theme.gradientEnd);
-
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.ellipse(blobX, blobY, scaledRx, scaledRy, 0, 0, Math.PI * 2);
-    ctx.fill();
+    drawBlurredGradientEllipse(ctx, width, height, blobX, blobY, scaledRx, scaledRy, theme.gradientStart, theme.gradientEnd, pGradFade);
 
     ctx.restore();
 
@@ -752,25 +800,47 @@ export default function App() {
 
     let animFrame;
     const loop = (time) => {
-      let dt = time - timeStateRef.current.lastTime;
+      animFrame = requestAnimationFrame(loop);
+
+      // Pause completely when tab is hidden
+      if (document.hidden) return;
+
+      // Cap to ~30fps — halves GPU/CPU work vs 60fps
+      const sinceLast = time - timeStateRef.current.lastTime;
+      if (sinceLast < 32) return;
+
+      let dt = sinceLast;
       if (dt > 100) dt = 16;
       timeStateRef.current.lastTime = time;
 
-      if (stateRef.current.isAnimated) {
+      const state = stateRef.current;
+      if (state.isAnimated) {
         timeStateRef.current.animatedTime += dt;
       }
 
+      // Skip redraw when the scene is fully static:
+      // intro animation done, animation off, no mouse interaction
+      const introAge = introStartTimeRef.current >= 0 ? time - introStartTimeRef.current : 0;
+      const introSettled = introAge > 3500;
+      const noInteraction = interactRef.current.weight < 0.001 && !mousePosRef.current;
+      if (!state.isAnimated && introSettled && noInteraction) return;
+
       ctx.clearRect(0, 0, width, height);
-      // We pass animatedTime in the state for drawScene
-      const renderState = { ...stateRef.current, animatedTime: timeStateRef.current.animatedTime };
+      const renderState = { ...state, animatedTime: timeStateRef.current.animatedTime };
       drawScene(ctx, width, height, time, renderState);
-      animFrame = requestAnimationFrame(loop);
     };
+
+    // Prevent a large dt spike when returning to the tab
+    const onVisibilityChange = () => {
+      if (!document.hidden) timeStateRef.current.lastTime = performance.now();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     animFrame = requestAnimationFrame(loop);
 
     return () => {
       if (animFrame) cancelAnimationFrame(animFrame);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [drawScene, format]);
 
