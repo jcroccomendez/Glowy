@@ -559,18 +559,19 @@ export default function App() {
     }
   };
 
-  // --- HALO DRAWING LOGIC (concentric ring sectors — circular variant of Waves) ---
+  // --- PULSE DRAWING LOGIC (centred concentric ring sectors — circular variant of Waves) ---
   const drawGlass = (ctx, width, height, time, state, elapsed) => {
     const theme = THEMES[state.colorTheme] || THEMES.neon;
 
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, width, height);
 
-    // Origin: bottom-right corner (or top-right when gradientPos === 'top'). Only
-    // the quadrant facing into the canvas is visible — that's our "fan".
-    const cornerX = width;
+    // Origin: bottom-centre (or top-centre when gradientPos === 'top'). Rings
+    // emanate as half-circles facing into the canvas, like ripples on a pond
+    // anchored to the bottom (or top) edge.
+    const cornerX = width / 2;
     const cornerY = state.gradientPos === 'bottom' ? height : 0;
-    const maxDiag = Math.hypot(width, height);
+    const maxDiag = Math.hypot(width / 2, height);
 
     const visibleRings = 13;
     const numRings = visibleRings;
