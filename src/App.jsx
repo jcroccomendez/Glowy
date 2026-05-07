@@ -448,8 +448,9 @@ export default function App() {
     for (let i = 0; i < numCols; i++) {
       ctx.save();
 
-      // Domino intro per column
-      const colDelayMs = i * 120;
+      // Domino intro per column. Waves has 17 columns (vs Spectrum's 9), so the
+      // per-column delay is ~half of Spectrum's so total intro time matches.
+      const colDelayMs = i * 60;
       const colDurationMs = 800;
       let rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
       const pColFade = Math.pow(rawColP, 2);
@@ -558,6 +559,134 @@ export default function App() {
     }
   };
 
+  // --- HALO DRAWING LOGIC (concentric ring sectors — circular variant of Waves) ---
+  const drawGlass = (ctx, width, height, time, state, elapsed) => {
+    const theme = THEMES[state.colorTheme] || THEMES.neon;
+
+    ctx.fillStyle = theme.bg;
+    ctx.fillRect(0, 0, width, height);
+
+    // Origin: bottom-right corner (or top-right when gradientPos === 'top'). Only
+    // the quadrant facing into the canvas is visible — that's our "fan".
+    const cornerX = width;
+    const cornerY = state.gradientPos === 'bottom' ? height : 0;
+    const maxDiag = Math.hypot(width, height);
+
+    const visibleRings = 13;
+    const numRings = visibleRings;
+    const ringStep = maxDiag / visibleRings;
+
+    const radius = Math.max(width, height) * 0.4;
+    const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
+    const baseBlobY = state.gradientPos === 'bottom'
+      ? height + (radius * yOffsetMultiplier)
+      : -(radius * yOffsetMultiplier);
+
+    const currentTime = state.animatedTime !== undefined ? state.animatedTime : time;
+
+    for (let i = 0; i < numRings; i++) {
+      ctx.save();
+
+      // Domino intro per ring — same timing profile as Waves
+      const ringDelayMs = i * 60;
+      const ringDurationMs = 800;
+      const rawColP = Math.max(0, Math.min((elapsed - 100 - ringDelayMs) / ringDurationMs, 1));
+      const pColFade = Math.pow(rawColP, 2);
+
+      // Annular clip (outer arc minus inner arc, evenodd via reverse-direction arc)
+      const innerR = i * ringStep;
+      const outerR = (i + 1) * ringStep;
+      ctx.beginPath();
+      ctx.arc(cornerX, cornerY, outerR, 0, Math.PI * 2, false);
+      if (innerR > 0) {
+        ctx.arc(cornerX, cornerY, innerR, 0, Math.PI * 2, true);
+      }
+      ctx.clip();
+
+      // Same time-shifted blob math as Spectrum/Waves
+      const delayMs = i * 400;
+      const t = (currentTime + delayMs) * 0.0015;
+
+      let baseBlobX = width / 2;
+      let cBlobY = baseBlobY;
+      let rx = radius;
+      let ry = radius;
+
+      const animX = Math.sin(t * 0.5) * (width * 0.25);
+      const animY = Math.cos(t * 0.8) * (height * 0.15);
+      rx += Math.sin(t * 1.2) * (width * 0.15);
+      ry += Math.cos(t * 1.5) * (height * 0.10);
+
+      const waveX = baseBlobX + animX;
+      const waveY = cBlobY + animY;
+
+      const blobX = waveX * (1 - interactRef.current.weight) + interactRef.current.x * interactRef.current.weight;
+      const blobY = waveY * (1 - interactRef.current.weight) + interactRef.current.y * interactRef.current.weight;
+
+      const gradScale = 0.9 + (0.1 * pColFade);
+      const scaledRx = rx * gradScale;
+      const scaledRy = ry * gradScale;
+
+      drawBlurredGradientEllipse(
+        ctx, width, height,
+        blobX, blobY, scaledRx, scaledRy,
+        theme.gradientStart, theme.gradientEnd, pColFade
+      );
+
+      ctx.restore();
+
+      // Dashed circular border at the inner edge of each visible ring (skip i=0
+      // — that would draw a degenerate dot at the corner).
+      if (i > 0 && i <= visibleRings) {
+        ctx.save();
+        ctx.globalAlpha = pColFade * 0.5;
+        ctx.setLineDash([8, 15]);
+        ctx.lineWidth = 2.0;
+
+        const lineGrad = ctx.createLinearGradient(0, 0, 0, height);
+        lineGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        lineGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0)');
+        lineGrad.addColorStop(1, '#FFFFFF');
+
+        ctx.strokeStyle = lineGrad;
+        ctx.beginPath();
+        ctx.arc(cornerX, cornerY, innerR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // Uploaded image overlay
+    if (state.uploadedImageObj) {
+      const img = state.uploadedImageObj;
+      let drawWidth = img.width;
+      let drawHeight = img.height;
+      const maxDrawWidth = width * 0.6;
+      const maxDrawHeight = height * 0.6;
+      if (drawWidth > maxDrawWidth || drawHeight > maxDrawHeight) {
+        const ratio = Math.min(maxDrawWidth / drawWidth, maxDrawHeight / drawHeight);
+        drawWidth *= ratio;
+        drawHeight *= ratio;
+      }
+      drawWidth *= state.imageScale;
+      drawHeight *= state.imageScale;
+      const drawX = (width - drawWidth) / 2;
+      const drawY = (height - drawHeight) / 2;
+      const imgP = Math.max(0, Math.min((elapsed - 300) / 400, 1));
+      const pImgFade = Math.pow(imgP, 2);
+      ctx.save();
+      ctx.globalAlpha = pImgFade;
+      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+      ctx.restore();
+    }
+
+    if (noiseCanvasRef.current) {
+      ctx.globalAlpha = 0.05;
+      ctx.drawImage(noiseCanvasRef.current, 0, 0, width, height);
+      ctx.globalAlpha = 1.0;
+    }
+  };
+
   // --- DRAWING LOGIC (RENDER LOOP) ---
   const drawScene = useCallback((ctx, width, height, time, injectedState) => {
     const state = injectedState || stateRef.current;
@@ -592,6 +721,11 @@ export default function App() {
 
     if (state.activeTab === 'radial') {
       drawWaves(ctx, width, height, time, state, elapsed);
+      return;
+    }
+
+    if (state.activeTab === 'glass') {
+      drawGlass(ctx, width, height, time, state, elapsed);
       return;
     }
 
@@ -975,7 +1109,16 @@ export default function App() {
       const dataUrl = tempCanvas.toDataURL('image/png');
       contentHtml = `<image href="${dataUrl}" x="0" y="0" width="${width}" height="${height}" />${imageHtml}`;
 
-
+    } else if (state.activeTab === 'glass') {
+      // Halo: ring sectors clipping a blurred gradient blob, plus dashed arcs.
+      // Same approach as the Waves SVG fallback — render to canvas and embed.
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+      drawGlass(tempCtx, width, height, performance.now(), state, 5000);
+      const dataUrl = tempCanvas.toDataURL('image/png');
+      contentHtml = `<image href="${dataUrl}" x="0" y="0" width="${width}" height="${height}" />${imageHtml}`;
     }
 
     const svgString = `
@@ -1116,204 +1259,205 @@ export default function App() {
         <div className="flex-shrink-0 p-3 flex">
           <div className="w-[280px] bg-[#181818] flex flex-col overflow-y-auto z-10 rounded-2xl">
 
-          {/* HEADER */}
-          <div className="px-4 pt-4 pb-3">
-            <h1 className="text-[14px] font-bold tracking-tight text-white">
-              Neon Theme Creator
-            </h1>
-          </div>
+            {/* HEADER */}
+            <div className="px-4 pt-4 pb-3">
+              <h1 className="text-[14px] font-bold tracking-tight text-white">
+                Neon Theme Creator
+              </h1>
+            </div>
 
-          {/* GENERAL TABS */}
-          <div className="flex">
-            {[
-              { id: 'neonPattern', label: 'Pattern' },
-              { id: 'spectrum', label: 'Spectrum' },
-              { id: 'radial', label: 'Waves' }
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 py-2 text-[11px] font-semibold transition-all relative ${isActive ? 'text-white' : 'text-[#666] hover:text-[#999]'
-                    }`}
-                >
-                  {tab.label}
-                  {isActive && (
-                    <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#00FF48]" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+            {/* GENERAL TABS */}
+            <div className="flex">
+              {[
+                { id: 'neonPattern', label: 'Pattern' },
+                { id: 'spectrum', label: 'Spectrum' },
+                { id: 'radial', label: 'Waves' },
+                { id: 'glass', label: 'Pulse' }
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex-1 py-2 text-[11px] font-semibold transition-all relative ${isActive ? 'text-white' : 'text-[#666] hover:text-[#999]'
+                      }`}
+                  >
+                    {tab.label}
+                    {isActive && (
+                      <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#00FF48]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* SCROLLABLE CONTROLS */}
-          <div className="flex flex-col flex-1 overflow-y-auto px-3 pt-2 gap-2">
+            {/* SCROLLABLE CONTROLS */}
+            <div className="flex flex-col flex-1 overflow-y-auto px-3 pt-2 gap-2">
 
-            {/* PRESETS SECTION */}
-            <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
-              <label className="text-[11px] font-semibold text-white mb-2 block">Presets</label>
-              <div className="flex gap-1">
-                {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
-                  const isActive = format === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setFormat(key)}
-                      className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-colors ${isActive
-                        ? 'bg-[#2a2a2a] text-white'
-                        : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
-                        }`}
-                    >
-                      <Icon className="w-5 h-5 mb-1" />
-                      <span className="text-[11px] font-medium">{label}</span>
-                    </button>
-                  )
-                })}
+              {/* PRESETS SECTION */}
+              <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                <label className="text-[11px] font-semibold text-white mb-2 block">Presets</label>
+                <div className="flex gap-1">
+                  {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
+                    const isActive = format === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setFormat(key)}
+                        className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-colors ${isActive
+                          ? 'bg-[#2a2a2a] text-white'
+                          : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
+                          }`}
+                      >
+                        <Icon className="w-5 h-5 mb-1" />
+                        <span className="text-[11px] font-medium">{label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
 
-            {/* COLOR THEME SECTION */}
-            <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
-              <label className="text-[11px] font-semibold text-white mb-2 block">Color Theme</label>
-              <div className="flex gap-1">
-                {Object.entries(THEMES).map(([key, t]) => {
-                  const isActive = colorTheme === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setColorTheme(key)}
-                      className={`flex-1 flex flex-col items-center justify-center gap-2 px-1 rounded-lg transition-colors h-[64px] ${isActive
-                        ? 'bg-[#2a2a2a]'
-                        : 'bg-transparent hover:bg-[#252525]'
-                        }`}
-                    >
-                      <div className="flex justify-center gap-[2px]">
-                        {t.preview.map((c, i) => (
-                          <div
-                            key={i}
-                            className="w-3 h-3 rounded-full"
-                            style={{
-                              backgroundColor: c,
-                              boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 4px ${c}60` : ''}`,
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <span className={`text-[11px] font-medium text-center leading-none ${isActive ? 'text-white' : 'text-[#666]'
-                        }`}>{t.label}</span>
-                    </button>
-                  );
-                })}
+              {/* COLOR THEME SECTION */}
+              <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                <label className="text-[11px] font-semibold text-white mb-2 block">Color Theme</label>
+                <div className="flex gap-1">
+                  {Object.entries(THEMES).map(([key, t]) => {
+                    const isActive = colorTheme === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setColorTheme(key)}
+                        className={`flex-1 flex flex-col items-center justify-center gap-2 px-1 rounded-lg transition-colors h-[64px] ${isActive
+                          ? 'bg-[#2a2a2a]'
+                          : 'bg-transparent hover:bg-[#252525]'
+                          }`}
+                      >
+                        <div className="flex justify-center gap-[2px]">
+                          {t.preview.map((c, i) => (
+                            <div
+                              key={i}
+                              className="w-3 h-3 rounded-full"
+                              style={{
+                                backgroundColor: c,
+                                boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 4px ${c}60` : ''}`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <span className={`text-[11px] font-medium text-center leading-none ${isActive ? 'text-white' : 'text-[#666]'
+                          }`}>{t.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            {/* CLASSIC MODE CONTROLS */}
-            {activeTab === 'neonPattern' && (
-              <>
-                <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
-                  <DirectionPad
-                    label="Dot Direction"
-                    direction={direction}
-                    onChange={setDirection}
-                  />
-                </div>
-
-                <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
-                  <Slider
-                    label="Thickness"
-                    min={0.5} max={5} step={0.1}
-                    value={dotSize}
-                    onChange={setDotSize}
-                    formatValue={(v) => v.toFixed(1) + 'px'}
-                  />
-                  <div className="h-1.5"></div>
-                  <Slider
-                    label="Density"
-                    min={10} max={60} step={2}
-                    value={dotSpacing}
-                    onChange={setDotSpacing}
-                    formatValue={(v) => v + 'px'}
-                  />
-                </div>
-
-                <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
-                  <DirectionPad
-                    label="Gradient Pos"
-                    direction={gradientPos}
-                    onChange={setGradientPos}
-                    disabledDirs={['left', 'right']}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* ANIMATION TOGGLE */}
-            <div className="bg-[#1e1e1e] rounded-xl px-3 py-1">
-              <Switch
-                label="Animate Effect"
-                checked={isAnimated}
-                onChange={setIsAnimated}
-              />
-            </div>
-
-            {/* UPLOAD IMAGE */}
-            <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
-              <label className="text-[11px] font-semibold text-white mb-2 block">Upload Logo</label>
-              <input
-                type="file"
-                accept="image/*,.svg"
-                onChange={handleImageUpload}
-                className="w-full text-[11px] text-[#666] file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[11px] file:font-medium file:bg-[#282828] file:text-[#999] hover:file:bg-[#2e2e2e] cursor-pointer"
-              />
-
-              {uploadedImageObj && (
+              {/* CLASSIC MODE CONTROLS */}
+              {activeTab === 'neonPattern' && (
                 <>
-                  <div className="my-2 h-px bg-[#333]" />
-                  <Slider
-                    label="Image Scale"
-                    min={0.1} max={3} step={0.1}
-                    value={imageScale}
-                    onChange={setImageScale}
-                    formatValue={(v) => (v * 100).toFixed(0) + '%'}
-                  />
+                  <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                    <DirectionPad
+                      label="Dot Direction"
+                      direction={direction}
+                      onChange={setDirection}
+                    />
+                  </div>
+
+                  <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                    <Slider
+                      label="Thickness"
+                      min={0.5} max={5} step={0.1}
+                      value={dotSize}
+                      onChange={setDotSize}
+                      formatValue={(v) => v.toFixed(1) + 'px'}
+                    />
+                    <div className="h-1.5"></div>
+                    <Slider
+                      label="Density"
+                      min={10} max={60} step={2}
+                      value={dotSpacing}
+                      onChange={setDotSpacing}
+                      formatValue={(v) => v + 'px'}
+                    />
+                  </div>
+
+                  <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                    <DirectionPad
+                      label="Gradient Pos"
+                      direction={gradientPos}
+                      onChange={setGradientPos}
+                      disabledDirs={['left', 'right']}
+                    />
+                  </div>
                 </>
               )}
+
+              {/* ANIMATION TOGGLE */}
+              <div className="bg-[#1e1e1e] rounded-xl px-3 py-1">
+                <Switch
+                  label="Animate Effect"
+                  checked={isAnimated}
+                  onChange={setIsAnimated}
+                />
+              </div>
+
+              {/* UPLOAD IMAGE */}
+              <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                <label className="text-[11px] font-semibold text-white mb-2 block">Upload Logo</label>
+                <input
+                  type="file"
+                  accept="image/*,.svg"
+                  onChange={handleImageUpload}
+                  className="w-full text-[11px] text-[#666] file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[11px] file:font-medium file:bg-[#282828] file:text-[#999] hover:file:bg-[#2e2e2e] cursor-pointer"
+                />
+
+                {uploadedImageObj && (
+                  <>
+                    <div className="my-2 h-px bg-[#333]" />
+                    <Slider
+                      label="Image Scale"
+                      min={0.1} max={3} step={0.1}
+                      value={imageScale}
+                      onChange={setImageScale}
+                      formatValue={(v) => (v * 100).toFixed(0) + '%'}
+                    />
+                  </>
+                )}
+              </div>
+
             </div>
 
-          </div>
-
-          {/* EXPORT ACTIONS */}
-          <div className="flex flex-col gap-1.5 px-3 pb-3">
-            <button
-              onClick={handleExportSVG}
-              disabled={isRecording}
-              className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-xl transition-colors font-medium text-[12px] disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export SVG
-            </button>
-            <button
-              onClick={handleExportVideo}
-              disabled={isRecording}
-              className={`flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl transition-all font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
-                ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
-                }`}
-            >
-              {isRecording ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  Recording...
-                </>
-              ) : (
-                <>
-                  <Video className="w-3.5 h-3.5" />
-                  Export Video (MP4)
-                </>
-              )}
-            </button>
-          </div>
+            {/* EXPORT ACTIONS */}
+            <div className="flex flex-col gap-1.5 px-3 pb-3">
+              <button
+                onClick={handleExportSVG}
+                disabled={isRecording}
+                className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-xl transition-colors font-medium text-[12px] disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export SVG
+              </button>
+              <button
+                onClick={handleExportVideo}
+                disabled={isRecording}
+                className={`flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl transition-all font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
+                  ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                  : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
+                  }`}
+              >
+                {isRecording ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    Recording...
+                  </>
+                ) : (
+                  <>
+                    <Video className="w-3.5 h-3.5" />
+                    Export Video (MP4)
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
