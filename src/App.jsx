@@ -112,7 +112,7 @@ const TABS = [
 // --- TOOLTIP (pill-shaped label that matches the rail button height) ---
 const Tooltip = ({ label, side = 'right', children }) => {
   const sideClasses = {
-    right: 'left-full top-1/2 ml-3 -translate-y-1/2',
+    right: 'left-full top-1/2 ml-2 -translate-y-1/2',
     left: 'right-full top-1/2 mr-3 -translate-y-1/2',
     top: 'bottom-full left-1/2 mb-2 -translate-x-1/2',
     bottom: 'top-full left-1/2 mt-2 -translate-x-1/2',
@@ -122,7 +122,7 @@ const Tooltip = ({ label, side = 'right', children }) => {
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none absolute ${sideClasses[side]} h-12 px-5 inline-flex items-center bg-[#1e1e1e] text-white text-[16px] font-semibold rounded-full whitespace-nowrap shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-150 z-50`}
+        className={`pointer-events-none absolute ${sideClasses[side]} h-[30px] px-4 inline-flex items-center bg-[#1e1e1e] text-white text-[12px] font-regular rounded-full whitespace-nowrap shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-150 z-50`}
       >
         {label}
       </span>
