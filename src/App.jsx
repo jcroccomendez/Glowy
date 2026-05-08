@@ -104,10 +104,31 @@ const PulseIcon = (props) => (
 
 const TABS = [
   { id: 'neonPattern', label: 'Pattern', Icon: PatternIcon },
-  { id: 'spectrum',    label: 'Spectrum', Icon: SpectrumIcon },
-  { id: 'radial',      label: 'Waves',   Icon: WavesIcon },
-  { id: 'glass',       label: 'Pulse',   Icon: PulseIcon },
+  { id: 'spectrum', label: 'Spectrum', Icon: SpectrumIcon },
+  { id: 'radial', label: 'Waves', Icon: WavesIcon },
+  { id: 'glass', label: 'Pulse', Icon: PulseIcon },
 ];
+
+// --- TOOLTIP (pill-shaped label that matches the rail button height) ---
+const Tooltip = ({ label, side = 'right', children }) => {
+  const sideClasses = {
+    right: 'left-full top-1/2 ml-3 -translate-y-1/2',
+    left: 'right-full top-1/2 mr-3 -translate-y-1/2',
+    top: 'bottom-full left-1/2 mb-2 -translate-x-1/2',
+    bottom: 'top-full left-1/2 mt-2 -translate-x-1/2',
+  };
+  return (
+    <div className="relative group">
+      {children}
+      <span
+        role="tooltip"
+        className={`pointer-events-none absolute ${sideClasses[side]} h-12 px-5 inline-flex items-center bg-[#1e1e1e] text-white text-[16px] font-semibold rounded-full whitespace-nowrap shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-150 z-50`}
+      >
+        {label}
+      </span>
+    </div>
+  );
+};
 
 // --- COMPONENTS ---
 
@@ -145,11 +166,11 @@ const Switch = ({ label, checked, onChange, icon }) => (
     </div>
     <button
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors focus:outline-none ${checked ? 'bg-[#00FF48]' : 'bg-[#333]'
+      className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[#00FF48]' : 'bg-[#333]'
         }`}
     >
       <span
-        className={`inline-block h-[14px] w-[14px] transform rounded-full transition-transform shadow-sm ${checked ? 'translate-x-[18px] bg-[#181818]' : 'translate-x-0.5 bg-[#666]'
+        className={`inline-block h-[14px] w-[14px] transform rounded-full transition-transform duration-200 shadow-sm ${checked ? 'translate-x-[18px] bg-[#181818]' : 'translate-x-0.5 bg-[#666]'
           }`}
       />
     </button>
@@ -160,7 +181,7 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
   const getPillClass = (dir) => {
     const isDisabled = disabledDirs.includes(dir);
     const isActive = direction === dir;
-    const base = `absolute transition-colors ${isDisabled ? 'opacity-10 cursor-not-allowed' : 'cursor-pointer'}`;
+    const base = `absolute transition-colors duration-200 ${isDisabled ? 'opacity-10 cursor-not-allowed' : 'cursor-pointer'}`;
 
     const activeColor = "bg-[#00FF48]";
     const inactiveColor = "bg-[#333] hover:bg-[#444]";
@@ -217,6 +238,18 @@ export default function App() {
       setPanelOpen(true);
     }
   };
+
+  // Close the side panel when clicking anywhere outside the rail/panel.
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onMouseDown = (e) => {
+      if (railRef.current?.contains(e.target)) return;
+      if (panelRef.current?.contains(e.target)) return;
+      setPanelOpen(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [panelOpen]);
   const [colorTheme, setColorTheme] = useState('neon');
   const [uploadedImageSrc, setUploadedImageSrc] = useState(null);
   const [uploadedImageObj, setUploadedImageObj] = useState(null);
@@ -251,6 +284,8 @@ export default function App() {
   const liquidCanvasRef = useRef(null);
   const blurOffscreenRef = useRef(null);
   const dotsCacheRef = useRef(null);
+  const railRef = useRef(null);
+  const panelRef = useRef(null);
 
   const handleMouseMove = (e) => {
     const canvas = canvasRef.current;
@@ -1379,27 +1414,29 @@ export default function App() {
         <div className="flex-1 relative px-6 pb-6 overflow-hidden">
 
           {/* ICON RAIL — vertically centred against the viewport */}
-          <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
+          <div ref={railRef} className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
             {TABS.map(({ id, label, Icon }) => {
-              const isActiveLit = activeTab === id && panelOpen;
+              const isActive = activeTab === id;
               return (
-                <button
-                  key={id}
-                  onClick={() => handleTabClick(id)}
-                  title={label}
-                  className={`w-12 h-12 rounded-[16px] transition-colors duration-200 flex items-center justify-center ${isActiveLit
-                    ? 'bg-[#00FF48] text-[#181818]'
-                    : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
-                    }`}
-                >
-                  <Icon className="w-full h-full" />
-                </button>
+                <Tooltip key={id} label={label} side="right">
+                  <button
+                    onClick={() => handleTabClick(id)}
+                    aria-label={label}
+                    className={`w-12 h-12 rounded-[19px] transition-colors duration-200 flex items-center justify-center ${isActive
+                      ? 'bg-[#00FF48] text-[#181818]'
+                      : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
+                      }`}
+                  >
+                    <Icon className="w-full h-full" />
+                  </button>
+                </Tooltip>
               );
             })}
           </div>
 
           {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
           <div
+            ref={panelRef}
             className={`absolute left-[88px] top-1/2 -translate-y-1/2 w-[280px] bg-[#181818] flex flex-col rounded-2xl overflow-hidden z-10 transition-opacity duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
               }`}
             style={{ maxHeight: 'calc(100% - 16px)' }}
@@ -1549,27 +1586,27 @@ export default function App() {
             </div>
           </div>
 
-          {/* CANVAS PREVIEW — always centred in the viewport, regardless of panel state */}
-          <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          >
+          {/* CANVAS PREVIEW — canvas itself is centred (label is absolutely
+              positioned above it so it doesn't shift the centre point) */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div
-              className="flex flex-col items-center pointer-events-auto"
+              className="relative pointer-events-auto"
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
-              style={{ maxHeight: '100%', maxWidth: '100%' }}
             >
-              <span className="text-[11px] text-[#666] mb-2 self-start">{FORMATS[format].label}</span>
+              <span className="absolute -top-7 left-1 text-[13px] font-semibold text-[#888] select-none">
+                {FORMATS[format].label}
+              </span>
               <div
                 ref={containerRef}
                 className="relative shadow-2xl rounded-sm overflow-hidden"
                 style={{
                   aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
-                  maxHeight: 'calc(100% - 24px)',
-                  maxWidth: '100%',
+                  maxHeight: 'calc(100vh - 140px)',
+                  maxWidth: 'calc(100vw - 160px)',
                 }}
               >
-                <canvas ref={canvasRef} className="block transition-all" />
+                <canvas ref={canvasRef} className="block w-full h-full transition-all" />
               </div>
             </div>
           </div>
