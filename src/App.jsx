@@ -36,6 +36,79 @@ const FORMATS = {
   desktop: { width: 1920, height: 1080, label: "Desktop", icon: Monitor }
 };
 
+// --- TAB ICONS (use currentColor so the active state can flip white → dark) ---
+const PatternIcon = (props) => (
+  <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <circle cx="19" cy="19" r="2" fill="currentColor" />
+    <circle opacity="0.8" cx="19" cy="25" r="2" fill="currentColor" />
+    <circle opacity="0.7" cx="19" cy="31" r="2" fill="currentColor" />
+    <circle opacity="0.5" cx="19" cy="37" r="2" fill="currentColor" />
+    <circle opacity="0.8" cx="25" cy="19" r="2" fill="currentColor" />
+    <circle opacity="0.7" cx="25" cy="25" r="2" fill="currentColor" />
+    <circle opacity="0.5" cx="25" cy="31" r="2" fill="currentColor" />
+    <circle opacity="0.3" cx="25" cy="37" r="2" fill="currentColor" />
+    <circle opacity="0.7" cx="31" cy="19" r="2" fill="currentColor" />
+    <circle opacity="0.5" cx="31" cy="25" r="2" fill="currentColor" />
+    <circle opacity="0.3" cx="31" cy="31" r="2" fill="currentColor" />
+    <circle opacity="0.2" cx="31" cy="37" r="2" fill="currentColor" />
+    <circle opacity="0.5" cx="37" cy="19" r="2" fill="currentColor" />
+    <circle opacity="0.3" cx="37" cy="25" r="2" fill="currentColor" />
+    <circle opacity="0.2" cx="37" cy="31" r="2" fill="currentColor" />
+    <circle opacity="0.05" cx="37" cy="37" r="2" fill="currentColor" />
+  </svg>
+);
+
+const SpectrumIcon = (props) => (
+  <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <rect x="18" y="16" width="4" height="24" fill="currentColor" />
+    <rect opacity="0.8" x="22" y="23.2" width="4" height="16.8" fill="currentColor" />
+    <rect opacity="0.6" x="26" y="26.8" width="4" height="13.2" fill="currentColor" />
+    <rect opacity="0.4" x="30" y="18.4" width="4" height="21.6" fill="currentColor" />
+    <rect opacity="0.2" x="34" y="26.8" width="4" height="13.2" fill="currentColor" />
+  </svg>
+);
+
+const WavesIcon = (props) => (
+  <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <g clipPath="url(#wavesIconClip)">
+      <circle cx="16.5" cy="39.5" r="4.5" stroke="currentColor" strokeWidth="4" />
+      <circle opacity="0.8" cx="16.5" cy="39.5" r="8.5" stroke="currentColor" strokeWidth="4" />
+      <circle opacity="0.6" cx="16.5" cy="39.5" r="12.5" stroke="currentColor" strokeWidth="4" />
+      <circle opacity="0.4" cx="16.5" cy="39.5" r="16.5" stroke="currentColor" strokeWidth="4" />
+      <circle opacity="0.2" cx="16.5" cy="39.5" r="20.5" stroke="currentColor" strokeWidth="4" />
+    </g>
+    <defs>
+      <clipPath id="wavesIconClip">
+        <rect width="24" height="24" fill="white" transform="translate(16 16)" />
+      </clipPath>
+    </defs>
+  </svg>
+);
+
+const PulseIcon = (props) => (
+  <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <g clipPath="url(#pulseIconClip)">
+      <circle cx="27.5" cy="41.5" r="4.5" stroke="currentColor" strokeWidth="4" />
+      <circle opacity="0.8" cx="27.5" cy="41.5" r="8.5" stroke="currentColor" strokeWidth="4" />
+      <circle opacity="0.6" cx="27.5" cy="41.5" r="12.5" stroke="currentColor" strokeWidth="4" />
+      <circle opacity="0.4" cx="27.5" cy="41.5" r="16.5" stroke="currentColor" strokeWidth="4" />
+      <circle opacity="0.2" cx="27.5" cy="41.5" r="20.5" stroke="currentColor" strokeWidth="4" />
+    </g>
+    <defs>
+      <clipPath id="pulseIconClip">
+        <rect width="24" height="24" fill="white" transform="translate(16 16)" />
+      </clipPath>
+    </defs>
+  </svg>
+);
+
+const TABS = [
+  { id: 'neonPattern', label: 'Pattern', Icon: PatternIcon },
+  { id: 'spectrum',    label: 'Spectrum', Icon: SpectrumIcon },
+  { id: 'radial',      label: 'Waves',   Icon: WavesIcon },
+  { id: 'glass',       label: 'Pulse',   Icon: PulseIcon },
+];
+
 // --- COMPONENTS ---
 
 const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v }) => {
@@ -133,6 +206,17 @@ export default function App() {
   const [dotSpacing, setDotSpacing] = useState(28);
   const [gradientPos, setGradientPos] = useState('bottom');
   const [activeTab, setActiveTab] = useState('neonPattern'); // 'neonPattern' | 'spectrum' | 'radial'
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  // Click on a nav: same tab → toggle the panel; different tab → switch + open
+  const handleTabClick = (id) => {
+    if (id === activeTab) {
+      setPanelOpen((p) => !p);
+    } else {
+      setActiveTab(id);
+      setPanelOpen(true);
+    }
+  };
   const [colorTheme, setColorTheme] = useState('neon');
   const [uploadedImageSrc, setUploadedImageSrc] = useState(null);
   const [uploadedImageObj, setUploadedImageObj] = useState(null);
@@ -1254,46 +1338,82 @@ export default function App() {
         body { font-family: 'Inter', sans-serif; margin: 0; background: ${APP_BG}; }
       `}} />
 
-      <div className="flex h-screen w-screen overflow-hidden text-zinc-100" style={{ backgroundColor: APP_BG }}>
+      <div className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100" style={{ backgroundColor: APP_BG }}>
 
-        {/* CONTROLS SIDEBAR */}
-        <div className="flex-shrink-0 p-3 flex">
-          <div className="w-[280px] bg-[#181818] flex flex-col overflow-y-auto z-10 rounded-2xl">
+        {/* TOP BAR */}
+        <header className="flex items-center justify-between px-6 py-4 flex-shrink-0">
+          <h1 className="text-[15px] font-bold tracking-tight text-white">Neon Theme Creator</h1>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportSVG}
+              disabled={isRecording}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-full transition-colors duration-200 font-medium text-[12px] disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export SVG
+            </button>
+            <button
+              onClick={handleExportVideo}
+              disabled={isRecording}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
+                ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
+                }`}
+            >
+              {isRecording ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  Recording...
+                </>
+              ) : (
+                <>
+                  <Video className="w-3.5 h-3.5" />
+                  Export Video (MP4)
+                </>
+              )}
+            </button>
+          </div>
+        </header>
 
-            {/* HEADER */}
-            <div className="px-4 pt-4 pb-3">
-              <h1 className="text-[14px] font-bold tracking-tight text-white">
-                Neon Theme Creator
-              </h1>
+        {/* MAIN AREA — relative so children can be absolutely positioned and centred */}
+        <div className="flex-1 relative px-6 pb-6 overflow-hidden">
+
+          {/* ICON RAIL — vertically centred against the viewport */}
+          <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
+            {TABS.map(({ id, label, Icon }) => {
+              const isActiveLit = activeTab === id && panelOpen;
+              return (
+                <button
+                  key={id}
+                  onClick={() => handleTabClick(id)}
+                  title={label}
+                  className={`w-12 h-12 rounded-[16px] transition-colors duration-200 flex items-center justify-center ${isActiveLit
+                    ? 'bg-[#00FF48] text-[#181818]'
+                    : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
+                    }`}
+                >
+                  <Icon className="w-full h-full" />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
+          <div
+            className={`absolute left-[88px] top-1/2 -translate-y-1/2 w-[280px] bg-[#181818] flex flex-col rounded-2xl overflow-hidden z-10 transition-opacity duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+              }`}
+            style={{ maxHeight: 'calc(100% - 16px)' }}
+          >
+
+            {/* PANEL TITLE — matches the active tab */}
+            <div className="px-4 pt-4 pb-2">
+              <h2 className="text-[#00FF48] text-[12px] font-bold tracking-tight">
+                {TABS.find((t) => t.id === activeTab)?.label}
+              </h2>
             </div>
 
-            {/* GENERAL TABS */}
-            <div className="flex">
-              {[
-                { id: 'neonPattern', label: 'Pattern' },
-                { id: 'spectrum', label: 'Spectrum' },
-                { id: 'radial', label: 'Waves' },
-                { id: 'glass', label: 'Pulse' }
-              ].map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 py-2 text-[11px] font-semibold transition-all relative ${isActive ? 'text-white' : 'text-[#666] hover:text-[#999]'
-                      }`}
-                  >
-                    {tab.label}
-                    {isActive && (
-                      <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#00FF48]" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* SCROLLABLE CONTROLS */}
-            <div className="flex flex-col flex-1 overflow-y-auto px-3 pt-2 gap-2">
+            {/* CONTROLS — height auto-fits content, scrolls only when overflowing the viewport */}
+            <div className="flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2">
 
               {/* PRESETS SECTION */}
               <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
@@ -1305,7 +1425,7 @@ export default function App() {
                       <button
                         key={key}
                         onClick={() => setFormat(key)}
-                        className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-colors ${isActive
+                        className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-colors duration-200 ${isActive
                           ? 'bg-[#2a2a2a] text-white'
                           : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
                           }`}
@@ -1313,7 +1433,7 @@ export default function App() {
                         <Icon className="w-5 h-5 mb-1" />
                         <span className="text-[11px] font-medium">{label}</span>
                       </button>
-                    )
+                    );
                   })}
                 </div>
               </div>
@@ -1328,7 +1448,7 @@ export default function App() {
                       <button
                         key={key}
                         onClick={() => setColorTheme(key)}
-                        className={`flex-1 flex flex-col items-center justify-center gap-2 px-1 rounded-lg transition-colors h-[64px] ${isActive
+                        className={`flex-1 flex flex-col items-center justify-center gap-2 px-1 rounded-lg transition-colors duration-200 h-[64px] ${isActive
                           ? 'bg-[#2a2a2a]'
                           : 'bg-transparent hover:bg-[#252525]'
                           }`}
@@ -1353,7 +1473,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* CLASSIC MODE CONTROLS */}
+              {/* CLASSIC MODE CONTROLS (Pattern only) */}
               {activeTab === 'neonPattern' && (
                 <>
                   <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
@@ -1427,56 +1547,34 @@ export default function App() {
               </div>
 
             </div>
+          </div>
 
-            {/* EXPORT ACTIONS */}
-            <div className="flex flex-col gap-1.5 px-3 pb-3">
-              <button
-                onClick={handleExportSVG}
-                disabled={isRecording}
-                className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-xl transition-colors font-medium text-[12px] disabled:opacity-50"
+          {/* CANVAS PREVIEW — always centred in the viewport, regardless of panel state */}
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          >
+            <div
+              className="flex flex-col items-center pointer-events-auto"
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              style={{ maxHeight: '100%', maxWidth: '100%' }}
+            >
+              <span className="text-[11px] text-[#666] mb-2 self-start">{FORMATS[format].label}</span>
+              <div
+                ref={containerRef}
+                className="relative shadow-2xl rounded-sm overflow-hidden"
+                style={{
+                  aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
+                  maxHeight: 'calc(100% - 24px)',
+                  maxWidth: '100%',
+                }}
               >
-                <Download className="w-3.5 h-3.5" />
-                Export SVG
-              </button>
-              <button
-                onClick={handleExportVideo}
-                disabled={isRecording}
-                className={`flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl transition-all font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
-                  ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                  : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
-                  }`}
-              >
-                {isRecording ? (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                    Recording...
-                  </>
-                ) : (
-                  <>
-                    <Video className="w-3.5 h-3.5" />
-                    Export Video (MP4)
-                  </>
-                )}
-              </button>
+                <canvas ref={canvasRef} className="block transition-all" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* CANVAS RENDERING AREA */}
-        {/* CANVAS PREVIEW */}
-        <div
-          className="flex-1 relative flex flex-col p-8 items-center justify-center bg-[#131413] overflow-hidden"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-        >
-          <div ref={containerRef} className="relative shadow-2xl rounded-sm overflow-hidden" style={{ aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`, maxHeight: '100%', maxWidth: '100%' }}>
-            <canvas
-              ref={canvasRef}
-              className="block transition-all"
-            />
-          </div>
         </div>
-
       </div>
     </>
   );
