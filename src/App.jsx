@@ -109,6 +109,231 @@ const TABS = [
   { id: 'glass', label: 'Pulse', Icon: PulseIcon },
 ];
 
+// --- INTRO LOADER ---
+// Full-screen Waves (Neon theme) background animation with a centred card
+// containing the app title, a subtitle, a 0→100% progress counter and the
+// neonplace logo. Fades in on mount and fades out at 100%, then calls onDone.
+const NeonplaceLogo = ({ className }) => (
+  <div className={`inline-flex items-center gap-1.5 ${className || ''}`}>
+    <svg viewBox="0 0 20 17" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-[15px] w-auto" aria-hidden="true">
+      <path fillRule="evenodd" clipRule="evenodd" d="M19.089 0v9.113l-6.356 6.357-6.367-6.367L0 15.47V6.357L6.356 0l6.367 6.368L19.089 0Z" fill="#24F187" />
+      <path fillRule="evenodd" clipRule="evenodd" d="M6.367 15.47H4.71V14.3l1.657-1.657 1.656 1.657v1.17H6.367Z" fill="#fff" />
+    </svg>
+    <span className="text-white text-[14px] font-semibold tracking-tight leading-none">neonplace</span>
+  </div>
+);
+
+const Loader = ({ onDone }) => {
+  const canvasRef = useRef(null);
+  const [progress, setProgress] = useState(0);
+  const [shown, setShown] = useState(false);
+  const [hiding, setHiding] = useState(false);
+
+  // Trigger the entry fade after first paint
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  // Full-screen Waves animation (Neon theme).
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0;
+
+    const ctx = canvas.getContext('2d');
+
+    // Downscaled offscreen for the heavy 170px blur.
+    const DOWNSCALE = 4;
+    const off = document.createElement('canvas');
+    const offCtx = off.getContext('2d');
+
+    W = 443;
+    H = 469;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    off.width = Math.max(1, Math.ceil(W / DOWNSCALE));
+    off.height = Math.max(1, Math.ceil(H / DOWNSCALE));
+
+    const NEON = { bg: '#062F2C', gradStart: '#2482F1', gradEnd: '#00FF48' };
+
+    // Noise tile (same look as the main canvas's noise overlay).
+    const noiseSize = 256;
+    const noiseCanvas = document.createElement('canvas');
+    noiseCanvas.width = noiseSize;
+    noiseCanvas.height = noiseSize;
+    const noiseCtx = noiseCanvas.getContext('2d');
+    const imgData = noiseCtx.createImageData(noiseSize, noiseSize);
+    const nd = imgData.data;
+    for (let i = 0; i < nd.length; i += 4) {
+      const v = Math.random() * 255;
+      nd[i] = v; nd[i + 1] = v; nd[i + 2] = v; nd[i + 3] = 255;
+    }
+    noiseCtx.putImageData(imgData, 0, 0);
+
+    let raf;
+    const draw = (time) => {
+      const offS = off.width / W;
+      ctx.fillStyle = NEON.bg;
+      ctx.fillRect(0, 0, W, H);
+
+      const spectrumCols = 9;
+      const colWidth = W / spectrumCols;
+      const extraLeft = 4, extraRight = 4;
+      const numCols = spectrumCols + extraLeft + extraRight;
+      const startX = -extraLeft * colWidth;
+
+      const radius = Math.max(W, H) * 0.4;
+      const baseBlobY = H + radius * 0.30;
+      const animT = time * 0.00012;
+      const numPoints = 40;
+
+      const getWarpedX = (baseX, y) => {
+        const yRatio = y / H;
+        const focalX = W * 0.05;
+        const spread = Math.pow(yRatio, 0.7);
+        const targetX = baseX * 1.2;
+        const fanX = focalX + (targetX - focalX) * spread;
+        const arc = Math.sin(yRatio * Math.PI) * W * 0.035;
+        const breath = Math.sin(animT) * W * 0.008 * yRatio;
+        return fanX + arc + breath;
+      };
+
+      const boundaries = [];
+      for (let col = 0; col <= numCols; col++) {
+        const baseX = startX + col * colWidth;
+        const points = [];
+        for (let j = 0; j <= numPoints; j++) {
+          const y = (j / numPoints) * H;
+          points.push({ x: getWarpedX(baseX, y), y });
+        }
+        boundaries.push(points);
+      }
+
+      for (let i = 0; i < numCols; i++) {
+        ctx.save();
+        const leftBound = boundaries[i];
+        const rightBound = boundaries[i + 1];
+        ctx.beginPath();
+        ctx.moveTo(leftBound[0].x, leftBound[0].y);
+        for (let j = 1; j < leftBound.length; j++) ctx.lineTo(leftBound[j].x, leftBound[j].y);
+        for (let j = rightBound.length - 1; j >= 0; j--) ctx.lineTo(rightBound[j].x, rightBound[j].y);
+        ctx.closePath();
+        ctx.clip();
+
+        const t = (time + i * 400) * 0.0015;
+        const blobX = W / 2 + Math.sin(t * 0.5) * (W * 0.25);
+        const blobY = baseBlobY + Math.cos(t * 0.8) * (H * 0.15);
+        const rx = radius + Math.sin(t * 1.2) * (W * 0.15);
+        const ry = radius + Math.cos(t * 1.5) * (H * 0.10);
+
+        offCtx.clearRect(0, 0, off.width, off.height);
+        offCtx.filter = `blur(${170 * offS}px)`;
+        const grad = offCtx.createLinearGradient(
+          (blobX - rx) * offS, blobY * offS,
+          (blobX + rx) * offS, blobY * offS,
+        );
+        grad.addColorStop(0.1529, NEON.gradStart);
+        grad.addColorStop(0.8046, NEON.gradEnd);
+        offCtx.fillStyle = grad;
+        offCtx.beginPath();
+        offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
+        offCtx.fill();
+        offCtx.filter = 'none';
+        ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
+        ctx.restore();
+
+        if (i < numCols - 1) {
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.setLineDash([8, 15]);
+          ctx.lineWidth = 2;
+          const lineGrad = ctx.createLinearGradient(0, 0, 0, H);
+          lineGrad.addColorStop(0, 'rgba(255,255,255,0)');
+          lineGrad.addColorStop(0.35, 'rgba(255,255,255,0)');
+          lineGrad.addColorStop(1, '#FFFFFF');
+          ctx.strokeStyle = lineGrad;
+          const b = boundaries[i + 1];
+          ctx.beginPath();
+          ctx.moveTo(b[0].x, b[0].y);
+          for (let j = 1; j < b.length; j++) ctx.lineTo(b[j].x, b[j].y);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      ctx.save();
+      ctx.globalAlpha = 0.05;
+      const pat = ctx.createPattern(noiseCanvas, 'repeat');
+      if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
+      ctx.restore();
+
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  // 0 → 100 progress counter with ease-in-out timing. When it hits 100 we
+  // pause briefly, then fade out and notify the parent.
+  useEffect(() => {
+    const start = performance.now();
+    const duration = 5200;
+    let raf;
+    const tick = (now) => {
+      const k = Math.min(1, (now - start) / duration);
+      const eased = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      setProgress(Math.floor(eased * 100));
+      if (k < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        setProgress(100);
+        setTimeout(() => {
+          setHiding(true);
+          setTimeout(() => onDone?.(), 600);
+        }, 350);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onDone]);
+
+  return (
+    <div
+      className={`fixed inset-0 z-[100] overflow-hidden bg-[#0a0a0a] flex items-center justify-center transition-opacity duration-[600ms] ease-out ${shown && !hiding ? 'opacity-100' : 'opacity-0'}`}
+    >
+      <div
+        className="relative rounded-2xl overflow-hidden flex flex-col"
+        style={{
+          width: 443,
+          height: 469,
+          padding: '40px',
+          boxShadow: '0 4px 116px rgba(0,0,0,0.24)',
+        }}
+      >
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block pointer-events-none" />
+        <div className="relative text-white text-[18px] font-bold tracking-tight leading-tight">
+          Neon Theme Creator
+        </div>
+        <div className="relative text-white/60 text-[11px] font-normal mt-2 leading-snug max-w-[260px]">
+          A browser-based generator for animated neon backgrounds — all client-side.
+        </div>
+
+        <div className="relative mt-auto flex items-end justify-between">
+          <div className="text-white/80 text-[28px] font-normal tabular-nums select-none leading-none">
+            {progress}%
+          </div>
+          <NeonplaceLogo className="h-[17px] w-auto" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- TOOLTIP (pill-shaped label that matches the rail button height) ---
 const Tooltip = ({ label, side = 'right', children }) => {
   const sideClasses = {
@@ -220,6 +445,7 @@ export default function App() {
   const [format, setFormat] = useState('post');
   const [isAnimated, setIsAnimated] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
+  const [loaderDone, setLoaderDone] = useState(false);
 
   // Classic Mode state
   const [direction, setDirection] = useState('left');
@@ -1372,6 +1598,8 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; margin: 0; background: ${APP_BG}; }
       `}} />
+
+      {!loaderDone && <Loader onDone={() => setLoaderDone(true)} />}
 
       <div className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100" style={{ backgroundColor: APP_BG }}>
 
