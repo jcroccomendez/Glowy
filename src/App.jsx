@@ -125,9 +125,32 @@ const NeonplaceLogo = ({ className }) => (
 
 const Loader = ({ onDone }) => {
   const canvasRef = useRef(null);
+  const creatorRef = useRef(null);
+  const mousePosRef = useRef(null);
+  const interactRef = useRef({ x: 0, y: 0, weight: 0 });
   const [progress, setProgress] = useState(0);
   const [shown, setShown] = useState(false);
   const [hiding, setHiding] = useState(false);
+  const [creatorW, setCreatorW] = useState(0);
+
+  const handleMouseMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+      mousePosRef.current = null;
+      return;
+    }
+    const W = 669, H = 351.369;
+    mousePosRef.current = { x: (x / rect.width) * W, y: (y / rect.height) * H };
+  };
+  const handleMouseLeave = () => { mousePosRef.current = null; };
+
+  useEffect(() => {
+    if (creatorRef.current) setCreatorW(creatorRef.current.getBoundingClientRect().width);
+  }, []);
 
   // Trigger the entry fade after first paint
   useEffect(() => {
@@ -150,15 +173,15 @@ const Loader = ({ onDone }) => {
     const off = document.createElement('canvas');
     const offCtx = off.getContext('2d');
 
-    W = 443;
-    H = 469;
+    W = 669;
+    H = 351.369;
     canvas.width = W * DPR;
     canvas.height = H * DPR;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     off.width = Math.max(1, Math.ceil(W / DOWNSCALE));
     off.height = Math.max(1, Math.ceil(H / DOWNSCALE));
 
-    const NEON = { bg: '#062F2C', gradStart: '#2482F1', gradEnd: '#00FF48' };
+    const NEON = { bg: '#052825', gradStart: '#2482F1', gradEnd: '#00FF48' };
 
     // Noise tile (same look as the main canvas's noise overlay).
     const noiseSize = 256;
@@ -175,7 +198,17 @@ const Loader = ({ onDone }) => {
     noiseCtx.putImageData(imgData, 0, 0);
 
     let raf;
+    const startTime = performance.now();
     const draw = (time) => {
+      const elapsed = time - startTime;
+      const mPos = mousePosRef.current;
+      if (mPos) {
+        interactRef.current.weight += (0.2 - interactRef.current.weight) * 0.2;
+        interactRef.current.x += (mPos.x - interactRef.current.x) * 0.2;
+        interactRef.current.y += (mPos.y - interactRef.current.y) * 0.2;
+      } else {
+        interactRef.current.weight += (0 - interactRef.current.weight) * 0.2;
+      }
       const offS = off.width / W;
       ctx.fillStyle = NEON.bg;
       ctx.fillRect(0, 0, W, H);
@@ -189,7 +222,7 @@ const Loader = ({ onDone }) => {
       const radius = Math.max(W, H) * 0.4;
       const baseBlobY = H + radius * 0.30;
       const animT = time * 0.00012;
-      const numPoints = 40;
+      const numPoints = 60;
 
       const getWarpedX = (baseX, y) => {
         const yRatio = y / H;
@@ -214,6 +247,11 @@ const Loader = ({ onDone }) => {
       }
 
       for (let i = 0; i < numCols; i++) {
+        const colDelayMs = i * 60;
+        const colDurationMs = 800;
+        const rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
+        const pColFade = Math.pow(rawColP, 2);
+
         ctx.save();
         const leftBound = boundaries[i];
         const rightBound = boundaries[i + 1];
@@ -225,10 +263,16 @@ const Loader = ({ onDone }) => {
         ctx.clip();
 
         const t = (time + i * 400) * 0.0015;
-        const blobX = W / 2 + Math.sin(t * 0.5) * (W * 0.25);
-        const blobY = baseBlobY + Math.cos(t * 0.8) * (H * 0.15);
-        const rx = radius + Math.sin(t * 1.2) * (W * 0.15);
-        const ry = radius + Math.cos(t * 1.5) * (H * 0.10);
+        const waveX = W / 2 + Math.sin(t * 0.5) * (W * 0.25);
+        const waveY = baseBlobY + Math.cos(t * 0.8) * (H * 0.15);
+        const iw = interactRef.current.weight;
+        const blobX = waveX * (1 - iw) + interactRef.current.x * iw;
+        const blobY = waveY * (1 - iw) + interactRef.current.y * iw;
+        let rx = radius + Math.sin(t * 1.2) * (W * 0.15);
+        let ry = radius + Math.cos(t * 1.5) * (H * 0.10);
+        const gradScale = 0.9 + (0.1 * pColFade);
+        rx *= gradScale;
+        ry *= gradScale;
 
         offCtx.clearRect(0, 0, off.width, off.height);
         offCtx.filter = `blur(${170 * offS}px)`;
@@ -243,14 +287,16 @@ const Loader = ({ onDone }) => {
         offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
         offCtx.fill();
         offCtx.filter = 'none';
+        ctx.globalAlpha = pColFade;
         ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
+        ctx.globalAlpha = 1;
         ctx.restore();
 
         if (i < numCols - 1) {
           ctx.save();
-          ctx.globalAlpha = 0.5;
-          ctx.setLineDash([8, 15]);
-          ctx.lineWidth = 2;
+          ctx.globalAlpha = pColFade * 0.5;
+          ctx.setLineDash([5, 9.3]);
+          ctx.lineWidth = 1.24;
           const lineGrad = ctx.createLinearGradient(0, 0, 0, H);
           lineGrad.addColorStop(0, 'rgba(255,255,255,0)');
           lineGrad.addColorStop(0.35, 'rgba(255,255,255,0)');
@@ -265,7 +311,7 @@ const Loader = ({ onDone }) => {
         }
       }
       ctx.save();
-      ctx.globalAlpha = 0.05;
+      ctx.globalAlpha = 0.025;
       const pat = ctx.createPattern(noiseCanvas, 'repeat');
       if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
       ctx.restore();
@@ -304,30 +350,66 @@ const Loader = ({ onDone }) => {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] overflow-hidden bg-[#0a0a0a] flex items-center justify-center transition-opacity duration-[600ms] ease-out ${shown && !hiding ? 'opacity-100' : 'opacity-0'}`}
+      style={{ backgroundColor: APP_BG }}
+      className={`fixed inset-0 z-[100] overflow-hidden flex items-center justify-center transition-opacity duration-[600ms] ease-out ${shown && !hiding ? 'opacity-100' : 'opacity-0'}`}
     >
       <div
-        className="relative rounded-2xl overflow-hidden flex flex-col"
+        className="relative overflow-hidden flex flex-col"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
         style={{
-          width: 443,
-          height: 469,
-          padding: '40px',
+          width: 669,
+          height: 351.369,
+          flexShrink: 0,
+          background: '#052825',
+          padding: 44,
           boxShadow: '0 4px 116px rgba(0,0,0,0.24)',
         }}
       >
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block pointer-events-none" />
-        <div className="relative text-white text-[18px] font-bold tracking-tight leading-tight">
-          Neon Theme Creator
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full block pointer-events-none"
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'linear-gradient(90deg, #0A2624 0%, #0A2624 22%, rgba(10,38,36,0.98) 32%, rgba(10,38,36,0.93) 42%, rgba(10,38,36,0.84) 52%, rgba(10,38,36,0.7) 62%, rgba(10,38,36,0.52) 72%, rgba(10,38,36,0.32) 82%, rgba(10,38,36,0.14) 92%, rgba(10,38,36,0) 100%)',
+          }}
+        />
+        <div
+          className="relative text-white flex flex-col items-start"
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '37.676px',
+            fontWeight: 400,
+            lineHeight: '126%',
+          }}
+        >
+          <span>Neon</span>
+          <span>Theme</span>
+          <span ref={creatorRef} style={{ display: 'inline-block' }}>Creator</span>
         </div>
-        <div className="relative text-white/60 text-[11px] font-normal mt-2 leading-snug max-w-[260px]">
+        <div
+          className="relative mt-4 rounded-full overflow-hidden"
+          style={{ width: creatorW || 150, height: 4, backgroundColor: 'rgba(255,255,255,0.12)' }}
+        >
+          <div
+            className="h-full rounded-full transition-[width] duration-100 ease-linear"
+            style={{ width: `${progress}%`, backgroundColor: '#00FF48' }}
+          />
+        </div>
+        <div
+          className="relative mt-auto"
+          style={{
+            color: '#9CCBC7',
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '11.52px',
+            fontWeight: 400,
+            lineHeight: '17.766px',
+            maxWidth: '32ch',
+          }}
+        >
           A browser-based generator for animated neon backgrounds — all client-side.
-        </div>
-
-        <div className="relative mt-auto flex items-end justify-between">
-          <div className="text-white/80 text-[28px] font-normal tabular-nums select-none leading-none">
-            {progress}%
-          </div>
-          <NeonplaceLogo className="h-[17px] w-auto" />
         </div>
       </div>
     </div>
@@ -1597,6 +1679,11 @@ export default function App() {
         __html: `
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; margin: 0; background: ${APP_BG}; }
+        @keyframes fadeInLeft {
+          from { opacity: 0; transform: translateX(-16px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        .tab-fade-in-left { animation: fadeInLeft 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
       `}} />
 
       {!loaderDone && <Loader onDone={() => setLoaderDone(true)} />}
@@ -1678,7 +1765,7 @@ export default function App() {
             </div>
 
             {/* CONTROLS — height auto-fits content, scrolls only when overflowing the viewport */}
-            <div className="flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2">
+            <div key={activeTab} className="tab-fade-in-left flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2">
 
               {/* PRESETS SECTION */}
               <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
