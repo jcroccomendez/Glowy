@@ -2081,14 +2081,16 @@ export default function App() {
                           : 'bg-transparent hover:bg-[#252525]'
                           }`}
                       >
-                        <div className="flex justify-center gap-[2px]">
+                        <div className="flex justify-center">
                           {t.preview.map((c, i) => (
                             <div
                               key={i}
-                              className="w-3 h-3 rounded-full"
+                              className="w-3.5 h-3.5 rounded-full"
                               style={{
                                 backgroundColor: c,
-                                boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 4px ${c}60` : ''}`,
+                                marginLeft: i === 0 ? 0 : -4,
+                                zIndex: 3 - i,
+                                boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
                               }}
                             />
                           ))}
@@ -2172,12 +2174,58 @@ export default function App() {
                 style={{
                   aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
                   maxHeight: 'calc(100vh - 140px)',
+                  maxWidth: 'calc(100vw - 160px)',
                   transformStyle: 'preserve-3d',
                   willChange: 'transform',
-                  maxWidth: 'calc(100vw - 160px)',
                 }}
               >
                 <canvas ref={canvasRef} className="block w-full h-full transition-all" style={{ borderRadius: 20 }} />
+              </div>
+
+              {/* THEME SELECTOR — vertical on right of canvas. Active = gray
+                  rounded-square container holding both overlapping dots and the
+                  current tab label; inactive = dots + theme label only. */}
+              <div className="absolute left-full top-0 ml-6 flex flex-col gap-8">
+                {Object.entries(THEMES).map(([key, t]) => {
+                  const isActive = colorTheme === key;
+                  const tabLabel = TABS.find((tt) => tt.id === activeTab)?.label || t.label;
+                  const label = isActive ? tabLabel : t.label;
+                  const dots = (
+                    <div className="flex">
+                      {t.preview.map((c, i) => (
+                        <div
+                          key={i}
+                          className="w-3.5 h-3.5 rounded-full"
+                          style={{
+                            backgroundColor: c,
+                            marginLeft: i === 0 ? 0 : -4,
+                            zIndex: 3 - i,
+                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  );
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => { playSwitch(); setColorTheme(key); }}
+                      className="flex flex-col items-center group"
+                    >
+                      {isActive ? (
+                        <div className="bg-[#1e1e1e] rounded-2xl px-4 py-3 flex flex-col items-center gap-2">
+                          {dots}
+                          <span className="text-[13px] font-semibold leading-none text-white">{label}</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          {dots}
+                          <span className="text-[13px] font-medium leading-none text-[#666] group-hover:text-[#999] transition-colors duration-200">{label}</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
