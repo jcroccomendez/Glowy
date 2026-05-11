@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Download, Video, Monitor, Smartphone, Layout as ImageIcon } from 'lucide-react';
+import { Square, DeviceMobile, Desktop, DownloadSimple, FilmStrip, IconContext } from '@phosphor-icons/react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
@@ -32,9 +32,9 @@ const THEMES = {
 };
 
 const FORMATS = {
-  post: { width: 1080, height: 1350, label: "Post", icon: ImageIcon },
-  story: { width: 1080, height: 1920, label: "Story", icon: Smartphone },
-  desktop: { width: 1920, height: 1080, label: "Desktop", icon: Monitor }
+  post: { width: 1080, height: 1350, label: "Post", icon: Square },
+  story: { width: 1080, height: 1920, label: "Story", icon: DeviceMobile },
+  desktop: { width: 1920, height: 1080, label: "Desktop", icon: Desktop }
 };
 
 // --- TAB ICONS (use currentColor so the active state can flip white → dark) ---
@@ -445,6 +445,8 @@ const Tooltip = ({ label, side = 'right', children }) => {
 
 const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v }) => {
   const percentage = ((value - min) / (max - min)) * 100;
+  const [playTick] = useSound('/sounds/rollover6.ogg', { volume: 0.25 });
+  const lastPlayRef = useRef(0);
   return (
     <div className="flex flex-col gap-1 mb-1 last:mb-0">
       <div className="flex justify-between items-center">
@@ -457,7 +459,14 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        onChange={(e) => {
+          onChange(parseFloat(e.target.value));
+          const now = performance.now();
+          if (now - lastPlayRef.current > 40) {
+            lastPlayRef.current = now;
+            playTick();
+          }
+        }}
         className="w-full h-[2px] rounded-full appearance-none cursor-pointer focus:outline-none"
         style={{
           background: `linear-gradient(to right, #00FF48 0%, #00FF48 ${percentage}%, #333 ${percentage}%, #333 100%)`
@@ -468,7 +477,7 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
 };
 
 const Switch = ({ label, checked, onChange, icon }) => {
-  const [playClick] = useSound('/sounds/click-002.mp3', { volume: 0.4 });
+  const [playClick] = useSound('/sounds/rollover6.ogg', { volume: 0.4 });
   const toggle = () => { playClick(); onChange(!checked); };
   return (
   <div className="flex items-center justify-between py-1.5">
@@ -493,7 +502,7 @@ const Switch = ({ label, checked, onChange, icon }) => {
 };
 
 const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
-  const [playClick] = useSound('/sounds/click-002.mp3', { volume: 0.4 });
+  const [playClick] = useSound('/sounds/rollover6.ogg', { volume: 0.4 });
   const handle = (dir) => { if (!disabledDirs.includes(dir)) { playClick(); onChange(dir); } };
   const getPillClass = (dir) => {
     const isDisabled = disabledDirs.includes(dir);
@@ -546,8 +555,8 @@ export default function App() {
   const [gradientPos, setGradientPos] = useState('bottom');
   const [activeTab, setActiveTab] = useState('neonPattern'); // 'neonPattern' | 'spectrum' | 'radial'
   const [panelOpen, setPanelOpen] = useState(false);
-  const [playHover] = useSound('/sounds/rollover6.ogg', { volume: 0.48 });
-  const [playSwitch] = useSound('/sounds/click-002.mp3', { volume: 0.4 });
+  const [playHover] = useSound('/sounds/type_02.wav', { volume: 1, interrupt: true });
+  const [playSwitch] = useSound('/sounds/rollover6.ogg', { volume: 0.4 });
 
   // Click on a nav: same tab → toggle the panel; different tab → switch + open
   const handleTabClick = (id) => {
@@ -681,10 +690,10 @@ export default function App() {
     stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme };
   }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme]);
 
-  // Reset intro animation when changing tabs
+  // Reset intro animation when changing tabs or main UI becomes visible
   useEffect(() => {
     introStartTimeRef.current = -1;
-  }, [activeTab]);
+  }, [activeTab, loaderDone]);
 
   // Render a heavily-blurred gradient ellipse via downscale-blur-upscale.
   // The destination ctx draws an offscreen 1/4-size pre-blurred canvas instead
@@ -1696,16 +1705,38 @@ export default function App() {
           to { opacity: 1; transform: translateX(0); }
         }
         .tab-fade-in-left { animation: fadeInLeft 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #00FF48;
+          border: none;
+          cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #00FF48;
+          border: none;
+          cursor: pointer;
+        }
       `}} />
 
+      <IconContext.Provider value={{ weight: 'duotone' }}>
       {!loaderDone && (
-        <Loader
-          onFadeStart={() => { introStartTimeRef.current = -1; }}
-          onDone={() => setLoaderDone(true)}
-        />
+        <Loader onDone={() => setLoaderDone(true)} />
       )}
 
-      <div className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100" style={{ backgroundColor: APP_BG }}>
+      <div
+        className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100"
+        style={{
+          backgroundColor: APP_BG,
+          visibility: loaderDone ? 'visible' : 'hidden',
+        }}
+      >
 
         {/* TOP BAR */}
         <header className="flex items-center justify-between px-6 py-4 flex-shrink-0">
@@ -1716,7 +1747,7 @@ export default function App() {
               disabled={isRecording}
               className="flex items-center gap-2 px-4 py-2 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-full transition-colors duration-200 font-medium text-[12px] disabled:opacity-50"
             >
-              <Download className="w-3.5 h-3.5" />
+              <DownloadSimple className="w-3.5 h-3.5" />
               Export SVG
             </button>
             <button
@@ -1734,7 +1765,7 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <Video className="w-3.5 h-3.5" />
+                  <FilmStrip className="w-3.5 h-3.5" />
                   Export Video (MP4)
                 </>
               )}
@@ -1754,12 +1785,12 @@ export default function App() {
                 <button
                   onClick={() => { playHover(); handleTabClick(id); }}
                   aria-label={label}
-                  className={`w-12 h-12 rounded-[19px] transition-colors duration-200 flex items-center justify-center ${isActive
+                  className={`w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center ${isActive
                     ? 'bg-[#00FF48] text-[#181818]'
                     : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
                     }`}
                 >
-                  <Icon className="w-full h-full" />
+                  <Icon className="w-[95%] h-[95%]" />
                 </button>
               );
               return isOpen ? <div key={id}>{btn}</div> : <Tooltip key={id} label={label} side="right">{btn}</Tooltip>;
@@ -1798,13 +1829,13 @@ export default function App() {
                       <button
                         key={key}
                         onClick={() => { playSwitch(); setFormat(key); }}
-                        className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-colors duration-200 ${isActive
+                        className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg transition-colors duration-200 ${isActive
                           ? 'bg-[#2a2a2a] text-white'
                           : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
                           }`}
                       >
-                        <Icon className="w-5 h-5 mb-1" />
-                        <span className="text-[11px] font-medium">{label}</span>
+                        <Icon className="w-5 h-5" />
+                        <span className="text-[11px] font-medium leading-none">{label}</span>
                       </button>
                     );
                   })}
@@ -1927,6 +1958,7 @@ export default function App() {
 
         </div>
       </div>
+      </IconContext.Provider>
     </>
   );
 }
