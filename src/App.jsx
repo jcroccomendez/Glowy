@@ -123,7 +123,7 @@ const NeonplaceLogo = ({ className }) => (
   </div>
 );
 
-const Loader = ({ onDone }) => {
+const Loader = ({ onDone, onFadeStart }) => {
   const canvasRef = useRef(null);
   const creatorRef = useRef(null);
   const mousePosRef = useRef(null);
@@ -340,6 +340,7 @@ const Loader = ({ onDone }) => {
         setProgress(100);
         setTimeout(() => {
           setHiding(true);
+          onFadeStart?.();
           setTimeout(() => onDone?.(), 600);
         }, 350);
       }
@@ -363,12 +364,14 @@ const Loader = ({ onDone }) => {
           flexShrink: 0,
           background: '#052825',
           padding: 44,
+          borderRadius: 20,
           boxShadow: '0 4px 116px rgba(0,0,0,0.24)',
         }}
       >
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full block pointer-events-none"
+          style={{ borderRadius: 20 }}
         />
         <div
           className="absolute inset-0 pointer-events-none"
@@ -1686,7 +1689,12 @@ export default function App() {
         .tab-fade-in-left { animation: fadeInLeft 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
       `}} />
 
-      {!loaderDone && <Loader onDone={() => setLoaderDone(true)} />}
+      {!loaderDone && (
+        <Loader
+          onFadeStart={() => { introStartTimeRef.current = -1; }}
+          onDone={() => setLoaderDone(true)}
+        />
+      )}
 
       <div className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100" style={{ backgroundColor: APP_BG }}>
 
@@ -1752,10 +1760,14 @@ export default function App() {
           {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
           <div
             ref={panelRef}
-            className={`absolute left-[88px] top-1/2 -translate-y-1/2 w-[280px] bg-[#181818] flex flex-col rounded-2xl overflow-hidden z-10 transition-opacity duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            className={`absolute left-[88px] top-1/2 w-[280px] bg-[#181818] flex flex-col rounded-2xl overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
               }`}
-            style={{ maxHeight: 'calc(100% - 16px)' }}
+            style={{
+              maxHeight: 'calc(100% - 16px)',
+              transform: `translateY(-50%) translateX(${panelOpen ? '0px' : '16px'})`,
+            }}
           >
+          <div key={activeTab} className="tab-fade-in-left flex flex-col">
 
             {/* PANEL TITLE — matches the active tab */}
             <div className="px-4 pt-4 pb-2">
@@ -1765,7 +1777,7 @@ export default function App() {
             </div>
 
             {/* CONTROLS — height auto-fits content, scrolls only when overflowing the viewport */}
-            <div key={activeTab} className="tab-fade-in-left flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2">
+            <div className="flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2">
 
               {/* PRESETS SECTION */}
               <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
@@ -1874,30 +1886,8 @@ export default function App() {
                 />
               </div>
 
-              {/* UPLOAD IMAGE */}
-              <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
-                <label className="text-[11px] font-semibold text-white mb-2 block">Upload Logo</label>
-                <input
-                  type="file"
-                  accept="image/*,.svg"
-                  onChange={handleImageUpload}
-                  className="w-full text-[11px] text-[#666] file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[11px] file:font-medium file:bg-[#282828] file:text-[#999] hover:file:bg-[#2e2e2e] cursor-pointer"
-                />
 
-                {uploadedImageObj && (
-                  <>
-                    <div className="my-2 h-px bg-[#333]" />
-                    <Slider
-                      label="Image Scale"
-                      min={0.1} max={3} step={0.1}
-                      value={imageScale}
-                      onChange={setImageScale}
-                      formatValue={(v) => (v * 100).toFixed(0) + '%'}
-                    />
-                  </>
-                )}
-              </div>
-
+            </div>
             </div>
           </div>
 
@@ -1921,7 +1911,7 @@ export default function App() {
                   maxWidth: 'calc(100vw - 160px)',
                 }}
               >
-                <canvas ref={canvasRef} className="block w-full h-full transition-all" />
+                <canvas ref={canvasRef} className="block w-full h-full transition-all" style={{ borderRadius: 20 }} />
               </div>
             </div>
           </div>
