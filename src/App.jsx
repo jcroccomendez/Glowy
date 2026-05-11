@@ -187,10 +187,21 @@ const Loader = ({ onDone, onFadeStart }) => {
 
     const NEON = { bg: '#052825', gradStart: '#2482F1', gradEnd: '#00FF48' };
 
-    // Pre-render blurred ellipse via SVG (universal, no ctx.filter dependency)
-    const SPRITE_SIZE = 512;
-    const spriteSvg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${SPRITE_SIZE} ${SPRITE_SIZE}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${NEON.gradStart}'/><stop offset='80.46%' stop-color='${NEON.gradEnd}'/></linearGradient><filter id='b' x='-50%' y='-50%' width='200%' height='200%'><feGaussianBlur stdDeviation='38'/></filter></defs><ellipse cx='${SPRITE_SIZE / 2}' cy='${SPRITE_SIZE / 2}' rx='${SPRITE_SIZE / 2 * 0.7}' ry='${SPRITE_SIZE / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
+    // Pre-rasterize SVG blob to a high-res offscreen canvas. drawImage from this
+    // canvas downscales (sharp) instead of upscaling SVG raster (blurry).
+    const SS = Math.max(W, H);
+    const RASTER = 1024; // hi-res raster — drawn at ~534px on screen → downscale
+    const spriteCanvas = document.createElement('canvas');
+    spriteCanvas.width = RASTER;
+    spriteCanvas.height = RASTER;
+    let spriteReady = false;
+    const spriteSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='${RASTER}' height='${RASTER}' viewBox='0 0 ${SS} ${SS}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${NEON.gradStart}'/><stop offset='80.46%' stop-color='${NEON.gradEnd}'/></linearGradient><filter id='b' x='-100%' y='-100%' width='300%' height='300%'><feGaussianBlur stdDeviation='${(SS * 0.255).toFixed(1)}'/></filter></defs><ellipse cx='${SS / 2}' cy='${SS / 2}' rx='${SS / 2 * 0.7}' ry='${SS / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
     const spriteImg = new Image();
+    spriteImg.onload = () => {
+      const sctx = spriteCanvas.getContext('2d');
+      sctx.drawImage(spriteImg, 0, 0, RASTER, RASTER);
+      spriteReady = true;
+    };
     spriteImg.src = 'data:image/svg+xml;charset=utf-8,' + spriteSvg;
 
     // Noise tile (same look as the main canvas's noise overlay).
@@ -284,9 +295,9 @@ const Loader = ({ onDone, onFadeStart }) => {
         rx *= gradScale;
         ry *= gradScale;
 
-        if (spriteImg.complete && spriteImg.naturalWidth > 0) {
+        if (spriteReady) {
           ctx.globalAlpha = pColFade;
-          ctx.drawImage(spriteImg, blobX - rx, blobY - ry, rx * 2, ry * 2);
+          ctx.drawImage(spriteCanvas, blobX - rx, blobY - ry, rx * 2, ry * 2);
           ctx.globalAlpha = 1;
         } else {
           offCtx.clearRect(0, 0, off.width, off.height);
@@ -723,24 +734,42 @@ export default function App() {
   }, [activeTab, loaderDone]);
 
   // Pre-render a blurred linear-gradient ellipse via SVG feGaussianBlur (works
-  // on every browser, no canvas ctx.filter dependency). Loaded once per theme
-  // gradient and reused — per-frame cost is one drawImage.
-  const getBlobSprite = (gradStart, gradEnd) => {
-    const key = `${gradStart}|${gradEnd}`;
+  // on every browser, no canvas ctx.filter dependency). Sprite size matches the
+  // current format's largest dimension so per-frame drawImage scaling stays
+  // close to 1:1 — no pixelation when stretched to the blob's rx/ry.
+  const getBlobSprite = (gradStart, gradEnd, format) => {
+    const key = `${gradStart}|${gradEnd}|${format}`;
     if (blobSpriteRef.current[key]) return blobSpriteRef.current[key];
-    const SW = 512, SH = 512;
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${SW} ${SH}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${gradStart}'/><stop offset='80.46%' stop-color='${gradEnd}'/></linearGradient><filter id='b' x='-50%' y='-50%' width='200%' height='200%'><feGaussianBlur stdDeviation='38'/></filter></defs><ellipse cx='${SW / 2}' cy='${SH / 2}' rx='${SW / 2 * 0.7}' ry='${SH / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
+    const { width, height } = FORMATS[format] || FORMATS.post;
+    const SS = Math.max(width, height);
+    const blurSD = SS * 0.157; // matches original ctx.filter blur(170px) on 1080-canvas
+
+    // Rasterize the SVG to an OffscreenCanvas at high resolution (2x the
+    // expected max blob diameter) so per-frame drawImage downscales to the
+    // target → sharper than the browser's default SVG raster cache.
+    const rasterPx = Math.min(2048, Math.round(SS * 1.5));
+    const cacheCanvas = document.createElement('canvas');
+    cacheCanvas.width = rasterPx;
+    cacheCanvas.height = rasterPx;
+    blobSpriteRef.current[key] = { canvas: cacheCanvas, ready: false };
+
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${rasterPx}' height='${rasterPx}' viewBox='0 0 ${SS} ${SS}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${gradStart}'/><stop offset='80.46%' stop-color='${gradEnd}'/></linearGradient><filter id='b' x='-100%' y='-100%' width='300%' height='300%'><feGaussianBlur stdDeviation='${blurSD.toFixed(1)}'/></filter></defs><ellipse cx='${SS / 2}' cy='${SS / 2}' rx='${SS / 2 * 0.7}' ry='${SS / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
     const img = new Image();
+    img.onload = () => {
+      const cctx = cacheCanvas.getContext('2d');
+      cctx.drawImage(img, 0, 0, rasterPx, rasterPx);
+      blobSpriteRef.current[key].ready = true;
+    };
     img.src = 'data:image/svg+xml;charset=utf-8,' + svg;
-    blobSpriteRef.current[key] = img;
-    return img;
+    return blobSpriteRef.current[key];
   };
 
   const drawBlurredGradientEllipse = (ctx, mainW, mainH, cx, cy, rx, ry, gradStart, gradEnd, alpha) => {
-    const sprite = getBlobSprite(gradStart, gradEnd);
-    if (sprite.complete && sprite.naturalWidth > 0) {
+    const fmt = stateRef.current.format;
+    const sprite = getBlobSprite(gradStart, gradEnd, fmt);
+    if (sprite.ready) {
       ctx.globalAlpha = alpha;
-      ctx.drawImage(sprite, cx - rx, cy - ry, rx * 2, ry * 2);
+      ctx.drawImage(sprite.canvas, cx - rx, cy - ry, rx * 2, ry * 2);
       ctx.globalAlpha = 1;
       return;
     }
