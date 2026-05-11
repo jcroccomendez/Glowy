@@ -798,6 +798,15 @@ export default function App() {
     introStartTimeRef.current = -1;
   }, [activeTab, loaderDone]);
 
+  // Fade-in-up on canvas whenever the format preset or theme changes
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    el.classList.remove('canvas-fade-in-up');
+    void el.offsetWidth;
+    el.classList.add('canvas-fade-in-up');
+  }, [format, colorTheme]);
+
   // Pre-render a blurred linear-gradient ellipse via SVG feGaussianBlur (works
   // on every browser, no canvas ctx.filter dependency). Sprite size matches the
   // current format's largest dimension so per-frame drawImage scaling stays
@@ -1929,6 +1938,17 @@ export default function App() {
           to { opacity: 1; transform: translateX(0); }
         }
         .tab-fade-in-left { animation: fadeInLeft 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        @keyframes canvasFadeInUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .canvas-fade-in-up { animation: canvasFadeInUp 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        @keyframes themeFadeIn {
+          from { opacity: 0; transform: scale(0.86); }
+          50% { opacity: 1; }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .theme-fade-in { animation: themeFadeIn 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
         input[type="range"]::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
@@ -2088,7 +2108,7 @@ export default function App() {
                               className="w-3.5 h-3.5 rounded-full"
                               style={{
                                 backgroundColor: c,
-                                marginLeft: i === 0 ? 0 : -4,
+                                marginLeft: i === 0 ? 0 : -2,
                                 zIndex: 3 - i,
                                 boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
                               }}
@@ -2160,16 +2180,14 @@ export default function App() {
           {/* CANVAS PREVIEW — canvas itself is centred (label is absolutely
               positioned above it so it doesn't shift the centre point) */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="relative pointer-events-auto"
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
-            >
+            <div className="relative pointer-events-auto">
               <span className="absolute -top-7 left-1 text-[13px] font-semibold text-[#888] select-none">
                 {FORMATS[format].label}
               </span>
               <div
                 ref={containerRef}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
                 className="relative shadow-2xl rounded-sm overflow-hidden"
                 style={{
                   aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
@@ -2185,11 +2203,10 @@ export default function App() {
               {/* THEME SELECTOR — vertical on right of canvas. Active = gray
                   rounded-square container holding both overlapping dots and the
                   current tab label; inactive = dots + theme label only. */}
-              <div className="absolute left-full top-0 ml-6 flex flex-col gap-8">
+              <div className="absolute left-full top-0 flex flex-col" style={{ gap: 13, marginLeft: 13 }}>
                 {Object.entries(THEMES).map(([key, t]) => {
                   const isActive = colorTheme === key;
-                  const tabLabel = TABS.find((tt) => tt.id === activeTab)?.label || t.label;
-                  const label = isActive ? tabLabel : t.label;
+                  const label = t.label;
                   const dots = (
                     <div className="flex">
                       {t.preview.map((c, i) => (
@@ -2198,7 +2215,7 @@ export default function App() {
                           className="w-3.5 h-3.5 rounded-full"
                           style={{
                             backgroundColor: c,
-                            marginLeft: i === 0 ? 0 : -4,
+                            marginLeft: i === 0 ? 0 : -2,
                             zIndex: 3 - i,
                             boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
                           }}
@@ -2210,19 +2227,13 @@ export default function App() {
                     <button
                       key={key}
                       onClick={() => { playSwitch(); setColorTheme(key); }}
-                      className="flex flex-col items-center group"
+                      className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#181818]'}`}
+                      style={{ width: 80, height: 80 }}
                     >
-                      {isActive ? (
-                        <div className="bg-[#1e1e1e] rounded-2xl px-4 py-3 flex flex-col items-center gap-2">
-                          {dots}
-                          <span className="text-[13px] font-semibold leading-none text-white">{label}</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-2">
-                          {dots}
-                          <span className="text-[13px] font-medium leading-none text-[#666] group-hover:text-[#999] transition-colors duration-200">{label}</span>
-                        </div>
-                      )}
+                      <div key={isActive ? 'a' : 'i'} className={`flex flex-col items-center gap-2 ${isActive ? 'theme-fade-in' : ''}`}>
+                        {dots}
+                        <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${isActive ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>{label}</span>
+                      </div>
                     </button>
                   );
                 })}
