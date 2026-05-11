@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Download, Video, Monitor, Smartphone, Layout as ImageIcon } from 'lucide-react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
+import useSound from 'use-sound';
 
 // --- CONFIGURATION AND UTILITIES ---
 const APP_BG = '#131413'; // Unified general app background
@@ -466,16 +467,19 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
   );
 };
 
-const Switch = ({ label, checked, onChange, icon }) => (
+const Switch = ({ label, checked, onChange, icon }) => {
+  const [playClick] = useSound('/sounds/click-002.mp3', { volume: 0.4 });
+  const toggle = () => { playClick(); onChange(!checked); };
+  return (
   <div className="flex items-center justify-between py-1.5">
     <div className="flex items-center gap-2">
       {icon && <span className="text-[#666]">{icon}</span>}
-      <label className="text-[12px] font-medium text-white cursor-pointer" onClick={() => onChange(!checked)}>
+      <label className="text-[12px] font-medium text-white cursor-pointer" onClick={toggle}>
         {label}
       </label>
     </div>
     <button
-      onClick={() => onChange(!checked)}
+      onClick={toggle}
       className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[#00FF48]' : 'bg-[#333]'
         }`}
     >
@@ -485,9 +489,12 @@ const Switch = ({ label, checked, onChange, icon }) => (
       />
     </button>
   </div>
-);
+  );
+};
 
 const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
+  const [playClick] = useSound('/sounds/click-002.mp3', { volume: 0.4 });
+  const handle = (dir) => { if (!disabledDirs.includes(dir)) { playClick(); onChange(dir); } };
   const getPillClass = (dir) => {
     const isDisabled = disabledDirs.includes(dir);
     const isActive = direction === dir;
@@ -514,10 +521,10 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
           <div className="absolute left-1/2 top-0 w-px h-full bg-[#666] -translate-x-1/2"></div>
         </div>
 
-        <div onClick={() => !disabledDirs.includes('top') && onChange('top')} className={getPillClass('top')} />
-        <div onClick={() => !disabledDirs.includes('bottom') && onChange('bottom')} className={getPillClass('bottom')} />
-        <div onClick={() => !disabledDirs.includes('left') && onChange('left')} className={getPillClass('left')} />
-        <div onClick={() => !disabledDirs.includes('right') && onChange('right')} className={getPillClass('right')} />
+        <div onClick={() => handle('top')} className={getPillClass('top')} />
+        <div onClick={() => handle('bottom')} className={getPillClass('bottom')} />
+        <div onClick={() => handle('left')} className={getPillClass('left')} />
+        <div onClick={() => handle('right')} className={getPillClass('right')} />
       </div>
     </div>
   );
@@ -539,6 +546,8 @@ export default function App() {
   const [gradientPos, setGradientPos] = useState('bottom');
   const [activeTab, setActiveTab] = useState('neonPattern'); // 'neonPattern' | 'spectrum' | 'radial'
   const [panelOpen, setPanelOpen] = useState(false);
+  const [playHover] = useSound('/sounds/rollover6.ogg', { volume: 0.48 });
+  const [playSwitch] = useSound('/sounds/click-002.mp3', { volume: 0.4 });
 
   // Click on a nav: same tab → toggle the panel; different tab → switch + open
   const handleTabClick = (id) => {
@@ -1740,20 +1749,20 @@ export default function App() {
           <div ref={railRef} className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
             {TABS.map(({ id, label, Icon }) => {
               const isActive = activeTab === id;
-              return (
-                <Tooltip key={id} label={label} side="right">
-                  <button
-                    onClick={() => handleTabClick(id)}
-                    aria-label={label}
-                    className={`w-12 h-12 rounded-[19px] transition-colors duration-200 flex items-center justify-center ${isActive
-                      ? 'bg-[#00FF48] text-[#181818]'
-                      : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
-                      }`}
-                  >
-                    <Icon className="w-full h-full" />
-                  </button>
-                </Tooltip>
+              const isOpen = panelOpen && isActive;
+              const btn = (
+                <button
+                  onClick={() => { playHover(); handleTabClick(id); }}
+                  aria-label={label}
+                  className={`w-12 h-12 rounded-[19px] transition-colors duration-200 flex items-center justify-center ${isActive
+                    ? 'bg-[#00FF48] text-[#181818]'
+                    : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
+                    }`}
+                >
+                  <Icon className="w-full h-full" />
+                </button>
               );
+              return isOpen ? <div key={id}>{btn}</div> : <Tooltip key={id} label={label} side="right">{btn}</Tooltip>;
             })}
           </div>
 
@@ -1788,7 +1797,7 @@ export default function App() {
                     return (
                       <button
                         key={key}
-                        onClick={() => setFormat(key)}
+                        onClick={() => { playSwitch(); setFormat(key); }}
                         className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-lg transition-colors duration-200 ${isActive
                           ? 'bg-[#2a2a2a] text-white'
                           : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
@@ -1811,7 +1820,7 @@ export default function App() {
                     return (
                       <button
                         key={key}
-                        onClick={() => setColorTheme(key)}
+                        onClick={() => { playSwitch(); setColorTheme(key); }}
                         className={`flex-1 flex flex-col items-center justify-center gap-2 px-1 rounded-lg transition-colors duration-200 h-[64px] ${isActive
                           ? 'bg-[#2a2a2a]'
                           : 'bg-transparent hover:bg-[#252525]'

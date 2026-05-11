@@ -13,7 +13,8 @@
     "lucide-react": "^1.14.0",
     "mp4-muxer": "^5.2.2",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "use-sound": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
