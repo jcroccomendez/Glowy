@@ -608,6 +608,7 @@ export default function App() {
   const [isAnimated, setIsAnimated] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [loaderDone, setLoaderDone] = useState(false);
+  const [shapeCount, setShapeCount] = useState(9);
 
   // Preload all UI sounds on first paint
   useEffect(() => {
@@ -788,10 +789,10 @@ export default function App() {
     dotsCacheRef.current = null;
   }, [format]);
 
-  const stateRef = useRef({ direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme });
+  const stateRef = useRef({ direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount });
   useEffect(() => {
-    stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme };
-  }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme]);
+    stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount };
+  }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount]);
 
   // Reset intro animation when changing tabs or main UI becomes visible
   useEffect(() => {
@@ -873,7 +874,7 @@ export default function App() {
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, width, height);
 
-    const numCols = 9;
+    const numCols = state.shapeCount || 9;
     const colWidth = width / numCols;
     const radius = Math.max(width, height) * 0.6;
     const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
@@ -991,11 +992,11 @@ export default function App() {
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, width, height);
 
-    const spectrumCols = 9;
-    const colWidth = width / spectrumCols; // Same width as spectrum columns
+    const spectrumCols = state.shapeCount || 9;
+    const colWidth = width / spectrumCols;
     const extraLeft = 4;
     const extraRight = 4;
-    const numCols = spectrumCols + extraLeft + extraRight; // 17 total
+    const numCols = spectrumCols + extraLeft + extraRight;
     const startX = -extraLeft * colWidth;
 
     const radius = Math.max(width, height) * 0.4;
@@ -1164,7 +1165,7 @@ export default function App() {
     const cornerY = state.gradientPos === 'bottom' ? height : 0;
     const maxDiag = Math.hypot(width / 2, height);
 
-    const visibleRings = 13;
+    const visibleRings = state.shapeCount || 13;
     const numRings = visibleRings;
     const ringStep = maxDiag / visibleRings;
 
@@ -1640,7 +1641,7 @@ export default function App() {
       `;
     } else if (state.activeTab === 'spectrum') {
       let colsHtml = '';
-      const numCols = 9;
+      const numCols = state.shapeCount || 9;
       const colWidth = width / numCols;
       for (let i = 0; i < numCols; i++) {
         const delayMs = i * 400;
@@ -1693,7 +1694,7 @@ export default function App() {
 
     } else if (state.activeTab === 'radial') {
       // Waves — vector: warped column clip paths + blurred ellipse per column + dashed boundary curves
-      const spectrumCols = 9;
+      const spectrumCols = state.shapeCount || 9;
       const colWidth = width / spectrumCols;
       const extraLeft = 4, extraRight = 4;
       const numColsW = spectrumCols + extraLeft + extraRight;
@@ -1767,7 +1768,7 @@ export default function App() {
       const cornerX = width / 2;
       const cornerY = state.gradientPos === 'bottom' ? height : 0;
       const maxDiag = Math.hypot(width / 2, height);
-      const visibleRings = 13;
+      const visibleRings = state.shapeCount || 13;
       const ringStep = maxDiag / visibleRings;
       const radiusG = Math.max(width, height) * 0.4;
       const yOffG = state.format === 'desktop' ? 0.50 : 0.30;
@@ -2161,6 +2162,21 @@ export default function App() {
                     />
                   </div>
                 </>
+              )}
+
+              {/* SHAPE COUNT (Spectrum / Waves / Pulse) */}
+              {activeTab !== 'neonPattern' && (
+                <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                  <Slider
+                    label={activeTab === 'glass' ? 'Rings' : 'Columns'}
+                    min={activeTab === 'glass' ? 5 : 4}
+                    max={activeTab === 'glass' ? 24 : 20}
+                    step={1}
+                    value={shapeCount}
+                    onChange={setShapeCount}
+                    formatValue={(v) => v}
+                  />
+                </div>
               )}
 
               {/* ANIMATION TOGGLE */}
