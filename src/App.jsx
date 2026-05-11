@@ -187,6 +187,22 @@ const Loader = ({ onDone, onFadeStart }) => {
 
     const NEON = { bg: '#052825', gradStart: '#2482F1', gradEnd: '#00FF48' };
 
+    // Pre-render blurred linear-gradient ellipse sprite (blur baked once)
+    const SW = 512, SH = 512;
+    const spriteCanvas = document.createElement('canvas');
+    spriteCanvas.width = SW;
+    spriteCanvas.height = SH;
+    const spriteCtx = spriteCanvas.getContext('2d');
+    spriteCtx.filter = 'blur(50px)';
+    const spriteGrad = spriteCtx.createLinearGradient(0, SH / 2, SW, SH / 2);
+    spriteGrad.addColorStop(0.1529, NEON.gradStart);
+    spriteGrad.addColorStop(0.8046, NEON.gradEnd);
+    spriteCtx.fillStyle = spriteGrad;
+    spriteCtx.beginPath();
+    spriteCtx.ellipse(SW / 2, SH / 2, SW / 2 * 0.78, SH / 2 * 0.78, 0, 0, Math.PI * 2);
+    spriteCtx.fill();
+    spriteCtx.filter = 'none';
+
     // Noise tile (same look as the main canvas's noise overlay).
     const noiseSize = 256;
     const noiseCanvas = document.createElement('canvas');
@@ -286,34 +302,9 @@ const Loader = ({ onDone, onFadeStart }) => {
         rx *= gradScale;
         ry *= gradScale;
 
-        if (IS_MOBILE) {
-          const grad = ctx.createLinearGradient(blobX - rx, blobY, blobX + rx, blobY);
-          grad.addColorStop(0.1529, NEON.gradStart);
-          grad.addColorStop(0.8046, NEON.gradEnd);
-          ctx.fillStyle = grad;
-          ctx.globalAlpha = pColFade;
-          ctx.beginPath();
-          ctx.ellipse(blobX, blobY, rx, ry, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.globalAlpha = 1;
-        } else {
-          offCtx.clearRect(0, 0, off.width, off.height);
-          offCtx.filter = `blur(${170 * offS}px)`;
-          const grad = offCtx.createLinearGradient(
-            (blobX - rx) * offS, blobY * offS,
-            (blobX + rx) * offS, blobY * offS,
-          );
-          grad.addColorStop(0.1529, NEON.gradStart);
-          grad.addColorStop(0.8046, NEON.gradEnd);
-          offCtx.fillStyle = grad;
-          offCtx.beginPath();
-          offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
-          offCtx.fill();
-          offCtx.filter = 'none';
-          ctx.globalAlpha = pColFade;
-          ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
-          ctx.globalAlpha = 1;
-        }
+        ctx.globalAlpha = pColFade;
+        ctx.drawImage(spriteCanvas, blobX - rx, blobY - ry, rx * 2, ry * 2);
+        ctx.globalAlpha = 1;
         ctx.restore();
 
         if (i < numCols - 1) {
@@ -646,6 +637,7 @@ export default function App() {
   const timeStateRef = useRef({ lastTime: performance.now(), animatedTime: 1000 });
   const liquidCanvasRef = useRef(null);
   const blurOffscreenRef = useRef(null);
+  const blobSpriteCacheRef = useRef({});
   const dotsCacheRef = useRef(null);
   const railRef = useRef(null);
   const panelRef = useRef(null);
@@ -732,41 +724,36 @@ export default function App() {
   // Render a heavily-blurred gradient ellipse via downscale-blur-upscale.
   // The destination ctx draws an offscreen 1/4-size pre-blurred canvas instead
   // of running ctx.filter='blur(170px)' on the full-resolution canvas.
+  // Cache a blurred linear-gradient ellipse sprite per theme. Blur happens once
+  // at sprite creation (not per frame). Render via drawImage scaled to blob size
+  // — GPU-fast on mobile and desktop, no per-frame ctx.filter.
+  const getBlobSprite = (gradStart, gradEnd) => {
+    const key = `${gradStart}|${gradEnd}`;
+    if (blobSpriteCacheRef.current[key]) return blobSpriteCacheRef.current[key];
+    const SW = 512, SH = 512;
+    const c = document.createElement('canvas');
+    c.width = SW;
+    c.height = SH;
+    const cx = c.getContext('2d');
+    cx.filter = 'blur(50px)';
+    const g = cx.createLinearGradient(0, SH / 2, SW, SH / 2);
+    g.addColorStop(0.1529, gradStart);
+    g.addColorStop(0.8046, gradEnd);
+    cx.fillStyle = g;
+    cx.beginPath();
+    cx.ellipse(SW / 2, SH / 2, SW / 2 * 0.78, SH / 2 * 0.78, 0, 0, Math.PI * 2);
+    cx.fill();
+    cx.filter = 'none';
+    blobSpriteCacheRef.current[key] = c;
+    return c;
+  };
+
   const drawBlurredGradientEllipse = (ctx, mainW, mainH, cx, cy, rx, ry, gradStart, gradEnd, alpha) => {
-    if (IS_MOBILE) {
-      const gradient = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy);
-      gradient.addColorStop(0.1529, gradStart);
-      gradient.addColorStop(0.8046, gradEnd);
-      ctx.fillStyle = gradient;
-      ctx.globalAlpha = alpha;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      return;
-    }
-    const off = blurOffscreenRef.current;
-    if (!off) return;
-    const { canvas, ctx: offCtx, scale: s } = off;
-
-    offCtx.clearRect(0, 0, canvas.width, canvas.height);
-    offCtx.filter = `blur(${170 * s}px)`;
-
-    const gradient = offCtx.createLinearGradient(
-      (cx - rx) * s, cy * s,
-      (cx + rx) * s, cy * s
-    );
-    gradient.addColorStop(0.1529, gradStart);
-    gradient.addColorStop(0.8046, gradEnd);
-
-    offCtx.fillStyle = gradient;
-    offCtx.beginPath();
-    offCtx.ellipse(cx * s, cy * s, rx * s, ry * s, 0, 0, Math.PI * 2);
-    offCtx.fill();
-    offCtx.filter = 'none';
-
+    const sprite = getBlobSprite(gradStart, gradEnd);
+    // Sprite is 512×512 with the ellipse + blur baked in. Scale to 2*rx × 2*ry
+    // so the blob spans the same range; blur scales proportionally with size.
     ctx.globalAlpha = alpha;
-    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, mainW, mainH);
+    ctx.drawImage(sprite, cx - rx, cy - ry, rx * 2, ry * 2);
     ctx.globalAlpha = 1;
   };
 
