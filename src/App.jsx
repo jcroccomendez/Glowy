@@ -1595,25 +1595,115 @@ export default function App() {
       `;
 
     } else if (state.activeTab === 'radial') {
-      // Waves: render to canvas and embed as raster
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = width;
-      tempCanvas.height = height;
-      const tempCtx = tempCanvas.getContext('2d');
-      drawWaves(tempCtx, width, height, performance.now(), state, 5000);
-      const dataUrl = tempCanvas.toDataURL('image/png');
-      contentHtml = `<image href="${dataUrl}" x="0" y="0" width="${width}" height="${height}" />${imageHtml}`;
+      // Waves — vector: warped column clip paths + blurred ellipse per column + dashed boundary curves
+      const spectrumCols = 9;
+      const colWidth = width / spectrumCols;
+      const extraLeft = 4, extraRight = 4;
+      const numColsW = spectrumCols + extraLeft + extraRight;
+      const startXW = -extraLeft * colWidth;
+      const radiusW = Math.max(width, height) * 0.4;
+      const yOffW = state.format === 'desktop' ? 0.50 : 0.30;
+      const baseBlobYW = state.gradientPos === 'bottom' ? height + (radiusW * yOffW) : -(radiusW * yOffW);
+      const exportTime = 5000;
+      const animTW = exportTime * 0.00012;
+      const numPointsW = 60;
+
+      const getWarpedX = (baseX, y) => {
+        const yRatio = y / height;
+        const focalX = width * 0.05;
+        const spread = Math.pow(yRatio, 0.7);
+        const targetX = baseX * 1.2;
+        const fanX = focalX + (targetX - focalX) * spread;
+        const arc = Math.sin(yRatio * Math.PI) * width * 0.035;
+        const breath = Math.sin(animTW) * width * 0.008 * yRatio;
+        return fanX + arc + breath;
+      };
+
+      const boundariesW = [];
+      for (let col = 0; col <= numColsW; col++) {
+        const baseX = startXW + col * colWidth;
+        const pts = [];
+        for (let j = 0; j <= numPointsW; j++) {
+          const yy = (j / numPointsW) * height;
+          pts.push({ x: getWarpedX(baseX, yy), y: yy });
+        }
+        boundariesW.push(pts);
+      }
+
+      const pathFromPoints = (pts) => pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+      const clipPathFromColumn = (left, right) => {
+        const lp = pathFromPoints(left);
+        const rp = right.slice().reverse().map((p) => `L${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+        return `${lp} ${rp} Z`;
+      };
+
+      let defsCols = '';
+      let groupsCols = '';
+      let dashedCols = '';
+      for (let i = 0; i < numColsW; i++) {
+        const leftB = boundariesW[i];
+        const rightB = boundariesW[i + 1];
+        defsCols += `<clipPath id="clipW${i}"><path d="${clipPathFromColumn(leftB, rightB)}" /></clipPath>`;
+
+        const delayMs = i * 400;
+        const t = (exportTime + delayMs) * 0.0015;
+        const animX = Math.sin(t * 0.5) * (width * 0.25);
+        const animY = Math.cos(t * 0.8) * (height * 0.15);
+        const rxx = radiusW + Math.sin(t * 1.2) * (width * 0.15);
+        const ryy = radiusW + Math.cos(t * 1.5) * (height * 0.10);
+        const cx = width / 2 + animX;
+        const cy = baseBlobYW + animY;
+
+        groupsCols += `<g clip-path="url(#clipW${i})"><ellipse cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" rx="${rxx.toFixed(2)}" ry="${ryy.toFixed(2)}" fill="url(#blobGrad)" filter="url(#blurFilter)" /></g>`;
+
+        if (i < numColsW - 1) {
+          const b = boundariesW[i + 1];
+          const dStr = pathFromPoints(b);
+          dashedCols += `<path d="${dStr}" stroke="url(#borderGrad)" stroke-width="2" stroke-dasharray="8,15" fill="none" opacity="0.5" />`;
+        }
+      }
+
+      contentHtml = `<defs>${defsCols}</defs>${groupsCols}${dashedCols}${imageHtml}`;
 
     } else if (state.activeTab === 'glass') {
-      // Halo: ring sectors clipping a blurred gradient blob, plus dashed arcs.
-      // Same approach as the Waves SVG fallback — render to canvas and embed.
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = width;
-      tempCanvas.height = height;
-      const tempCtx = tempCanvas.getContext('2d');
-      drawGlass(tempCtx, width, height, performance.now(), state, 5000);
-      const dataUrl = tempCanvas.toDataURL('image/png');
-      contentHtml = `<image href="${dataUrl}" x="0" y="0" width="${width}" height="${height}" />${imageHtml}`;
+      // Halo — vector: annular ring clips + blurred ellipse per ring + dashed circles
+      const cornerX = width / 2;
+      const cornerY = state.gradientPos === 'bottom' ? height : 0;
+      const maxDiag = Math.hypot(width / 2, height);
+      const visibleRings = 13;
+      const ringStep = maxDiag / visibleRings;
+      const radiusG = Math.max(width, height) * 0.4;
+      const yOffG = state.format === 'desktop' ? 0.50 : 0.30;
+      const baseBlobYG = state.gradientPos === 'bottom' ? height + (radiusG * yOffG) : -(radiusG * yOffG);
+      const exportTime = 5000;
+
+      let defsRings = '';
+      let groupsRings = '';
+      let dashedRings = '';
+      for (let i = 0; i < visibleRings; i++) {
+        const innerR = i * ringStep;
+        const outerR = (i + 1) * ringStep;
+        const circ = (cx, cy, r) => `M${cx - r},${cy} a${r},${r} 0 1,0 ${r * 2},0 a${r},${r} 0 1,0 ${-r * 2},0`;
+        const outerD = circ(cornerX, cornerY, outerR);
+        const innerD = innerR > 0 ? ' ' + circ(cornerX, cornerY, innerR) : '';
+        defsRings += `<clipPath id="clipG${i}" clipPathUnits="userSpaceOnUse"><path d="${outerD}${innerD}" fill-rule="evenodd" /></clipPath>`;
+
+        const delayMs = i * 400;
+        const t = (exportTime + delayMs) * 0.0015;
+        const animX = Math.sin(t * 0.5) * (width * 0.25);
+        const animY = Math.cos(t * 0.8) * (height * 0.15);
+        const rxx = radiusG + Math.sin(t * 1.2) * (width * 0.15);
+        const ryy = radiusG + Math.cos(t * 1.5) * (height * 0.10);
+        const cx = width / 2 + animX;
+        const cy = baseBlobYG + animY;
+        groupsRings += `<g clip-path="url(#clipG${i})"><ellipse cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" rx="${rxx.toFixed(2)}" ry="${ryy.toFixed(2)}" fill="url(#blobGrad)" filter="url(#blurFilter)" /></g>`;
+
+        if (i > 0) {
+          dashedRings += `<circle cx="${cornerX}" cy="${cornerY}" r="${innerR.toFixed(2)}" fill="none" stroke="url(#borderGrad)" stroke-width="2" stroke-dasharray="8,15" opacity="0.5" />`;
+        }
+      }
+
+      contentHtml = `<defs>${defsRings}</defs>${groupsRings}${dashedRings}${imageHtml}`;
     }
 
     const svgString = `
@@ -1826,7 +1916,7 @@ export default function App() {
           <div ref={railRef} className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
             {TABS.map(({ id, label, Icon }) => {
               const isActive = activeTab === id;
-              const isOpen = panelOpen && isActive;
+              const isOpen = panelOpen;
               const btn = (
                 <button
                   onClick={() => { playHover(); handleTabClick(id); }}
