@@ -129,9 +129,11 @@ const NeonplaceLogo = ({ className }) => (
 
 const Loader = ({ onDone, onFadeStart }) => {
   const canvasRef = useRef(null);
+  const cardRef = useRef(null);
   const creatorRef = useRef(null);
   const mousePosRef = useRef(null);
   const interactRef = useRef({ x: 0, y: 0, weight: 0 });
+  const tiltRef = useRef({ trx: 0, tryY: 0, rx: 0, ry: 0 });
   const [progress, setProgress] = useState(0);
   const [shown, setShown] = useState(false);
   const [hiding, setHiding] = useState(false);
@@ -139,18 +141,48 @@ const Loader = ({ onDone, onFadeStart }) => {
 
   const handleMouseMove = (e) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const card = cardRef.current;
+    if (!canvas || !card) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
       mousePosRef.current = null;
+      tiltRef.current.trx = 0;
+      tiltRef.current.tryY = 0;
       return;
     }
     const W = 669, H = 351.369;
     mousePosRef.current = { x: (x / rect.width) * W, y: (y / rect.height) * H };
+    // 3D tilt: cursor offset from center → small rotation (max ±5°)
+    const cardRect = card.getBoundingClientRect();
+    const nx = (e.clientX - cardRect.left) / cardRect.width - 0.5;  // -0.5..0.5
+    const ny = (e.clientY - cardRect.top) / cardRect.height - 0.5;
+    tiltRef.current.tryY = nx * 6;   // rotateY range ±3°
+    tiltRef.current.trx = -ny * 6;   // rotateX range ±3°
   };
-  const handleMouseLeave = () => { mousePosRef.current = null; };
+  const handleMouseLeave = () => {
+    mousePosRef.current = null;
+    tiltRef.current.trx = 0;
+    tiltRef.current.tryY = 0;
+  };
+
+  // Spring-eased 3D tilt
+  useEffect(() => {
+    let raf;
+    const tick = () => {
+      const t = tiltRef.current;
+      t.rx += (t.trx - t.rx) * 0.12;
+      t.ry += (t.tryY - t.ry) * 0.12;
+      const el = cardRef.current;
+      if (el) {
+        el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   useEffect(() => {
     if (creatorRef.current) setCreatorW(creatorRef.current.getBoundingClientRect().width);
@@ -382,6 +414,7 @@ const Loader = ({ onDone, onFadeStart }) => {
       className={`fixed inset-0 z-[100] overflow-hidden flex items-center justify-center transition-opacity duration-[600ms] ease-out ${shown && !hiding ? 'opacity-100' : 'opacity-0'}`}
     >
       <div
+        ref={cardRef}
         className="relative overflow-hidden flex flex-col"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
@@ -393,6 +426,8 @@ const Loader = ({ onDone, onFadeStart }) => {
           padding: 44,
           borderRadius: 20,
           boxShadow: '0 4px 116px rgba(0,0,0,0.24)',
+          transformStyle: 'preserve-3d',
+          willChange: 'transform',
         }}
       >
         <canvas
@@ -653,9 +688,11 @@ export default function App() {
   const dotsCacheRef = useRef(null);
   const railRef = useRef(null);
   const panelRef = useRef(null);
+  const tiltRef = useRef({ trx: 0, tryY: 0, rx: 0, ry: 0 });
 
   const handleMouseMove = (e) => {
     const canvas = canvasRef.current;
+    const container = containerRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const canvasAspect = canvas.width / canvas.height;
@@ -685,11 +722,39 @@ export default function App() {
     } else {
       mousePosRef.current = null;
     }
+
+    // 3D tilt: cursor offset from canvas-container center → small rotation (±5°)
+    if (container) {
+      const cr = container.getBoundingClientRect();
+      const nx = (e.clientX - cr.left) / cr.width - 0.5;
+      const ny = (e.clientY - cr.top) / cr.height - 0.5;
+      tiltRef.current.tryY = nx * 6;
+      tiltRef.current.trx = -ny * 6;
+    }
   };
 
   const handleMouseLeave = () => {
     mousePosRef.current = null;
+    tiltRef.current.trx = 0;
+    tiltRef.current.tryY = 0;
   };
+
+  // Spring-eased 3D tilt on canvas container
+  useEffect(() => {
+    let raf;
+    const tick = () => {
+      const t = tiltRef.current;
+      t.rx += (t.trx - t.rx) * 0.12;
+      t.ry += (t.tryY - t.ry) * 0.12;
+      const el = containerRef.current;
+      if (el) {
+        el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // Generate noise pattern + allocate blur offscreen + invalidate dots cache
   useEffect(() => {
@@ -2107,6 +2172,8 @@ export default function App() {
                 style={{
                   aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
                   maxHeight: 'calc(100vh - 140px)',
+                  transformStyle: 'preserve-3d',
+                  willChange: 'transform',
                   maxWidth: 'calc(100vw - 160px)',
                 }}
               >
