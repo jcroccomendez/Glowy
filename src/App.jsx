@@ -167,7 +167,7 @@ const Loader = ({ onDone, onFadeStart }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const DPR = IS_MOBILE ? MOBILE_DPR : Math.min(window.devicePixelRatio || 1, 2);
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
     let W = 0, H = 0;
 
     const ctx = canvas.getContext('2d');
@@ -187,21 +187,11 @@ const Loader = ({ onDone, onFadeStart }) => {
 
     const NEON = { bg: '#052825', gradStart: '#2482F1', gradEnd: '#00FF48' };
 
-    // Pre-render blurred linear-gradient ellipse sprite (blur baked once)
-    const SW = 512, SH = 512;
-    const spriteCanvas = document.createElement('canvas');
-    spriteCanvas.width = SW;
-    spriteCanvas.height = SH;
-    const spriteCtx = spriteCanvas.getContext('2d');
-    spriteCtx.filter = 'blur(50px)';
-    const spriteGrad = spriteCtx.createLinearGradient(0, SH / 2, SW, SH / 2);
-    spriteGrad.addColorStop(0.1529, NEON.gradStart);
-    spriteGrad.addColorStop(0.8046, NEON.gradEnd);
-    spriteCtx.fillStyle = spriteGrad;
-    spriteCtx.beginPath();
-    spriteCtx.ellipse(SW / 2, SH / 2, SW / 2 * 0.78, SH / 2 * 0.78, 0, 0, Math.PI * 2);
-    spriteCtx.fill();
-    spriteCtx.filter = 'none';
+    // Pre-render blurred ellipse via SVG (universal, no ctx.filter dependency)
+    const SPRITE_SIZE = 512;
+    const spriteSvg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${SPRITE_SIZE} ${SPRITE_SIZE}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${NEON.gradStart}'/><stop offset='80.46%' stop-color='${NEON.gradEnd}'/></linearGradient><filter id='b' x='-50%' y='-50%' width='200%' height='200%'><feGaussianBlur stdDeviation='38'/></filter></defs><ellipse cx='${SPRITE_SIZE / 2}' cy='${SPRITE_SIZE / 2}' rx='${SPRITE_SIZE / 2 * 0.7}' ry='${SPRITE_SIZE / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
+    const spriteImg = new Image();
+    spriteImg.src = 'data:image/svg+xml;charset=utf-8,' + spriteSvg;
 
     // Noise tile (same look as the main canvas's noise overlay).
     const noiseSize = 256;
@@ -218,15 +208,8 @@ const Loader = ({ onDone, onFadeStart }) => {
     noiseCtx.putImageData(imgData, 0, 0);
 
     let raf;
-    let lastFrameTime = 0;
-    const frameInterval = IS_MOBILE ? (1000 / MOBILE_FPS) : 0;
     const startTime = performance.now();
     const draw = (time) => {
-      if (frameInterval && time - lastFrameTime < frameInterval) {
-        raf = requestAnimationFrame(draw);
-        return;
-      }
-      lastFrameTime = time;
       const elapsed = time - startTime;
       const mPos = mousePosRef.current;
       if (mPos) {
@@ -242,15 +225,14 @@ const Loader = ({ onDone, onFadeStart }) => {
 
       const spectrumCols = 9;
       const colWidth = W / spectrumCols;
-      const extraLeft = IS_MOBILE ? 2 : 4;
-      const extraRight = IS_MOBILE ? 2 : 4;
+      const extraLeft = 4, extraRight = 4;
       const numCols = spectrumCols + extraLeft + extraRight;
       const startX = -extraLeft * colWidth;
 
       const radius = Math.max(W, H) * 0.4;
       const baseBlobY = H + radius * 0.30;
       const animT = time * 0.00012;
-      const numPoints = IS_MOBILE ? 20 : 60;
+      const numPoints = 60;
 
       const getWarpedX = (baseX, y) => {
         const yRatio = y / H;
@@ -302,9 +284,28 @@ const Loader = ({ onDone, onFadeStart }) => {
         rx *= gradScale;
         ry *= gradScale;
 
-        ctx.globalAlpha = pColFade;
-        ctx.drawImage(spriteCanvas, blobX - rx, blobY - ry, rx * 2, ry * 2);
-        ctx.globalAlpha = 1;
+        if (spriteImg.complete && spriteImg.naturalWidth > 0) {
+          ctx.globalAlpha = pColFade;
+          ctx.drawImage(spriteImg, blobX - rx, blobY - ry, rx * 2, ry * 2);
+          ctx.globalAlpha = 1;
+        } else {
+          offCtx.clearRect(0, 0, off.width, off.height);
+          offCtx.filter = `blur(${170 * offS}px)`;
+          const grad = offCtx.createLinearGradient(
+            (blobX - rx) * offS, blobY * offS,
+            (blobX + rx) * offS, blobY * offS,
+          );
+          grad.addColorStop(0.1529, NEON.gradStart);
+          grad.addColorStop(0.8046, NEON.gradEnd);
+          offCtx.fillStyle = grad;
+          offCtx.beginPath();
+          offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
+          offCtx.fill();
+          offCtx.filter = 'none';
+          ctx.globalAlpha = pColFade;
+          ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
+          ctx.globalAlpha = 1;
+        }
         ctx.restore();
 
         if (i < numCols - 1) {
@@ -637,7 +638,7 @@ export default function App() {
   const timeStateRef = useRef({ lastTime: performance.now(), animatedTime: 1000 });
   const liquidCanvasRef = useRef(null);
   const blurOffscreenRef = useRef(null);
-  const blobSpriteCacheRef = useRef({});
+  const blobSpriteRef = useRef({});
   const dotsCacheRef = useRef(null);
   const railRef = useRef(null);
   const panelRef = useRef(null);
@@ -721,39 +722,45 @@ export default function App() {
     introStartTimeRef.current = -1;
   }, [activeTab, loaderDone]);
 
-  // Render a heavily-blurred gradient ellipse via downscale-blur-upscale.
-  // The destination ctx draws an offscreen 1/4-size pre-blurred canvas instead
-  // of running ctx.filter='blur(170px)' on the full-resolution canvas.
-  // Cache a blurred linear-gradient ellipse sprite per theme. Blur happens once
-  // at sprite creation (not per frame). Render via drawImage scaled to blob size
-  // — GPU-fast on mobile and desktop, no per-frame ctx.filter.
+  // Pre-render a blurred linear-gradient ellipse via SVG feGaussianBlur (works
+  // on every browser, no canvas ctx.filter dependency). Loaded once per theme
+  // gradient and reused — per-frame cost is one drawImage.
   const getBlobSprite = (gradStart, gradEnd) => {
     const key = `${gradStart}|${gradEnd}`;
-    if (blobSpriteCacheRef.current[key]) return blobSpriteCacheRef.current[key];
+    if (blobSpriteRef.current[key]) return blobSpriteRef.current[key];
     const SW = 512, SH = 512;
-    const c = document.createElement('canvas');
-    c.width = SW;
-    c.height = SH;
-    const cx = c.getContext('2d');
-    cx.filter = 'blur(50px)';
-    const g = cx.createLinearGradient(0, SH / 2, SW, SH / 2);
-    g.addColorStop(0.1529, gradStart);
-    g.addColorStop(0.8046, gradEnd);
-    cx.fillStyle = g;
-    cx.beginPath();
-    cx.ellipse(SW / 2, SH / 2, SW / 2 * 0.78, SH / 2 * 0.78, 0, 0, Math.PI * 2);
-    cx.fill();
-    cx.filter = 'none';
-    blobSpriteCacheRef.current[key] = c;
-    return c;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${SW} ${SH}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${gradStart}'/><stop offset='80.46%' stop-color='${gradEnd}'/></linearGradient><filter id='b' x='-50%' y='-50%' width='200%' height='200%'><feGaussianBlur stdDeviation='38'/></filter></defs><ellipse cx='${SW / 2}' cy='${SH / 2}' rx='${SW / 2 * 0.7}' ry='${SH / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
+    const img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + svg;
+    blobSpriteRef.current[key] = img;
+    return img;
   };
 
   const drawBlurredGradientEllipse = (ctx, mainW, mainH, cx, cy, rx, ry, gradStart, gradEnd, alpha) => {
     const sprite = getBlobSprite(gradStart, gradEnd);
-    // Sprite is 512×512 with the ellipse + blur baked in. Scale to 2*rx × 2*ry
-    // so the blob spans the same range; blur scales proportionally with size.
+    if (sprite.complete && sprite.naturalWidth > 0) {
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(sprite, cx - rx, cy - ry, rx * 2, ry * 2);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    // SVG sprite still loading — fall back to ctx.filter path for first frames
+    const off = blurOffscreenRef.current;
+    if (!off) return;
+    const { canvas, ctx: offCtx, scale: s } = off;
+
+    offCtx.clearRect(0, 0, canvas.width, canvas.height);
+    offCtx.filter = `blur(${170 * s}px)`;
+    const gradient = offCtx.createLinearGradient((cx - rx) * s, cy * s, (cx + rx) * s, cy * s);
+    gradient.addColorStop(0.1529, gradStart);
+    gradient.addColorStop(0.8046, gradEnd);
+    offCtx.fillStyle = gradient;
+    offCtx.beginPath();
+    offCtx.ellipse(cx * s, cy * s, rx * s, ry * s, 0, 0, Math.PI * 2);
+    offCtx.fill();
+    offCtx.filter = 'none';
     ctx.globalAlpha = alpha;
-    ctx.drawImage(sprite, cx - rx, cy - ry, rx * 2, ry * 2);
+    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, mainW, mainH);
     ctx.globalAlpha = 1;
   };
 
@@ -883,9 +890,9 @@ export default function App() {
 
     const spectrumCols = 9;
     const colWidth = width / spectrumCols; // Same width as spectrum columns
-    const extraLeft = IS_MOBILE ? 2 : 4;
-    const extraRight = IS_MOBILE ? 2 : 4;
-    const numCols = spectrumCols + extraLeft + extraRight;
+    const extraLeft = 4;
+    const extraRight = 4;
+    const numCols = spectrumCols + extraLeft + extraRight; // 17 total
     const startX = -extraLeft * colWidth;
 
     const radius = Math.max(width, height) * 0.4;
@@ -894,7 +901,7 @@ export default function App() {
 
     const currentTime = state.animatedTime !== undefined ? state.animatedTime : time;
     const animT = currentTime * 0.00012;
-    const numPoints = IS_MOBILE ? 22 : 60;
+    const numPoints = 60;
 
     // Fan warp: columns radiate from upper-left corner outward
     const getWarpedX = (baseX, y) => {
