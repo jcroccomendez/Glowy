@@ -5,6 +5,9 @@ import useSound from 'use-sound';
 
 // --- CONFIGURATION AND UTILITIES ---
 const APP_BG = '#131413'; // Unified general app background
+const IS_MOBILE = typeof window !== 'undefined' && (('ontouchstart' in window) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
+const MOBILE_DPR = 1;
+const MOBILE_FPS = 30;
 
 // Color Themes
 const THEMES = {
@@ -164,7 +167,7 @@ const Loader = ({ onDone, onFadeStart }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const DPR = IS_MOBILE ? MOBILE_DPR : Math.min(window.devicePixelRatio || 1, 2);
     let W = 0, H = 0;
 
     const ctx = canvas.getContext('2d');
@@ -199,8 +202,15 @@ const Loader = ({ onDone, onFadeStart }) => {
     noiseCtx.putImageData(imgData, 0, 0);
 
     let raf;
+    let lastFrameTime = 0;
+    const frameInterval = IS_MOBILE ? (1000 / MOBILE_FPS) : 0;
     const startTime = performance.now();
     const draw = (time) => {
+      if (frameInterval && time - lastFrameTime < frameInterval) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      lastFrameTime = time;
       const elapsed = time - startTime;
       const mPos = mousePosRef.current;
       if (mPos) {
@@ -216,14 +226,15 @@ const Loader = ({ onDone, onFadeStart }) => {
 
       const spectrumCols = 9;
       const colWidth = W / spectrumCols;
-      const extraLeft = 4, extraRight = 4;
+      const extraLeft = IS_MOBILE ? 2 : 4;
+      const extraRight = IS_MOBILE ? 2 : 4;
       const numCols = spectrumCols + extraLeft + extraRight;
       const startX = -extraLeft * colWidth;
 
       const radius = Math.max(W, H) * 0.4;
       const baseBlobY = H + radius * 0.30;
       const animT = time * 0.00012;
-      const numPoints = 60;
+      const numPoints = IS_MOBILE ? 20 : 60;
 
       const getWarpedX = (baseX, y) => {
         const yRatio = y / H;
@@ -275,22 +286,34 @@ const Loader = ({ onDone, onFadeStart }) => {
         rx *= gradScale;
         ry *= gradScale;
 
-        offCtx.clearRect(0, 0, off.width, off.height);
-        offCtx.filter = `blur(${170 * offS}px)`;
-        const grad = offCtx.createLinearGradient(
-          (blobX - rx) * offS, blobY * offS,
-          (blobX + rx) * offS, blobY * offS,
-        );
-        grad.addColorStop(0.1529, NEON.gradStart);
-        grad.addColorStop(0.8046, NEON.gradEnd);
-        offCtx.fillStyle = grad;
-        offCtx.beginPath();
-        offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
-        offCtx.fill();
-        offCtx.filter = 'none';
-        ctx.globalAlpha = pColFade;
-        ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
-        ctx.globalAlpha = 1;
+        if (IS_MOBILE) {
+          const grad = ctx.createLinearGradient(blobX - rx, blobY, blobX + rx, blobY);
+          grad.addColorStop(0.1529, NEON.gradStart);
+          grad.addColorStop(0.8046, NEON.gradEnd);
+          ctx.fillStyle = grad;
+          ctx.globalAlpha = pColFade;
+          ctx.beginPath();
+          ctx.ellipse(blobX, blobY, rx, ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        } else {
+          offCtx.clearRect(0, 0, off.width, off.height);
+          offCtx.filter = `blur(${170 * offS}px)`;
+          const grad = offCtx.createLinearGradient(
+            (blobX - rx) * offS, blobY * offS,
+            (blobX + rx) * offS, blobY * offS,
+          );
+          grad.addColorStop(0.1529, NEON.gradStart);
+          grad.addColorStop(0.8046, NEON.gradEnd);
+          offCtx.fillStyle = grad;
+          offCtx.beginPath();
+          offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
+          offCtx.fill();
+          offCtx.filter = 'none';
+          ctx.globalAlpha = pColFade;
+          ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
+          ctx.globalAlpha = 1;
+        }
         ctx.restore();
 
         if (i < numCols - 1) {
@@ -548,6 +571,17 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [loaderDone, setLoaderDone] = useState(false);
 
+  // Preload all UI sounds on first paint
+  useEffect(() => {
+    const urls = ['/sounds/type_02.wav', '/sounds/rollover6.ogg'];
+    urls.forEach((url) => {
+      const a = new Audio();
+      a.preload = 'auto';
+      a.src = url;
+      a.load();
+    });
+  }, []);
+
   // Classic Mode state
   const [direction, setDirection] = useState('left');
   const [dotSize, setDotSize] = useState(1.8);
@@ -699,6 +733,18 @@ export default function App() {
   // The destination ctx draws an offscreen 1/4-size pre-blurred canvas instead
   // of running ctx.filter='blur(170px)' on the full-resolution canvas.
   const drawBlurredGradientEllipse = (ctx, mainW, mainH, cx, cy, rx, ry, gradStart, gradEnd, alpha) => {
+    if (IS_MOBILE) {
+      const gradient = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy);
+      gradient.addColorStop(0.1529, gradStart);
+      gradient.addColorStop(0.8046, gradEnd);
+      ctx.fillStyle = gradient;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      return;
+    }
     const off = blurOffscreenRef.current;
     if (!off) return;
     const { canvas, ctx: offCtx, scale: s } = off;
@@ -850,10 +896,10 @@ export default function App() {
 
     const spectrumCols = 9;
     const colWidth = width / spectrumCols; // Same width as spectrum columns
-    const extraLeft = 4;  // Extra columns on the left
-    const extraRight = 4; // Extra columns on the right
-    const numCols = spectrumCols + extraLeft + extraRight; // 17 total
-    const startX = -extraLeft * colWidth; // Start 4 columns to the left
+    const extraLeft = IS_MOBILE ? 2 : 4;
+    const extraRight = IS_MOBILE ? 2 : 4;
+    const numCols = spectrumCols + extraLeft + extraRight;
+    const startX = -extraLeft * colWidth;
 
     const radius = Math.max(width, height) * 0.4;
     const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
@@ -861,7 +907,7 @@ export default function App() {
 
     const currentTime = state.animatedTime !== undefined ? state.animatedTime : time;
     const animT = currentTime * 0.00012;
-    const numPoints = 60;
+    const numPoints = IS_MOBILE ? 22 : 60;
 
     // Fan warp: columns radiate from upper-left corner outward
     const getWarpedX = (baseX, y) => {
