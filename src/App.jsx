@@ -870,14 +870,14 @@ export default function App() {
     introStartTimeRef.current = -1;
   }, [activeTab, loaderDone]);
 
-  // Fade-in-up on canvas whenever the format preset or theme changes
+  // Fade-in-up on canvas whenever the format preset, theme, or random theme changes
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
     el.classList.remove('canvas-fade-in-up');
     void el.offsetWidth;
     el.classList.add('canvas-fade-in-up');
-  }, [format, colorTheme]);
+  }, [format, colorTheme, customTheme]);
 
   // Pre-render a blurred linear-gradient ellipse via SVG feGaussianBlur (works
   // on every browser, no canvas ctx.filter dependency). Sprite size matches the
