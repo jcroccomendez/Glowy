@@ -1944,6 +1944,11 @@ export default function App() {
           to { opacity: 1; transform: translateY(0); }
         }
         .canvas-fade-in-up { animation: canvasFadeInUp 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .panel-scroll::-webkit-scrollbar { width: 4px; }
+        .panel-scroll::-webkit-scrollbar-track { background: transparent; }
+        .panel-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+        .panel-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+        .panel-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
         @keyframes themeFadeIn {
           from { opacity: 0; transform: scale(0.86); }
           50% { opacity: 1; }
@@ -2054,7 +2059,7 @@ export default function App() {
               transform: `translateY(-50%) translateX(${panelOpen ? '0px' : '16px'})`,
             }}
           >
-          <div key={activeTab} className="tab-fade-in-left flex flex-col">
+          <div key={activeTab} className="tab-fade-in-left flex flex-col flex-1 min-h-0">
 
             {/* PANEL TITLE — matches the active tab */}
             <div className="px-4 pt-4 pb-2">
@@ -2064,7 +2069,7 @@ export default function App() {
             </div>
 
             {/* CONTROLS — height auto-fits content, scrolls only when overflowing the viewport */}
-            <div className="flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2">
+            <div className="panel-scroll flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2 flex-1 min-h-0">
 
               {/* PRESETS SECTION */}
               <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
@@ -2145,7 +2150,7 @@ export default function App() {
                       onChange={setDotSize}
                       formatValue={(v) => v.toFixed(1) + 'px'}
                     />
-                    <div className="h-1.5"></div>
+                    <div style={{ height: 8 }}></div>
                     <Slider
                       label="Density"
                       min={10} max={60} step={2}
