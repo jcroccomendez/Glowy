@@ -1979,7 +1979,9 @@ export default function App() {
         className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100"
         style={{
           backgroundColor: APP_BG,
-          visibility: loaderDone ? 'visible' : 'hidden',
+          opacity: loaderDone ? 1 : 0,
+          pointerEvents: loaderDone ? 'auto' : 'none',
+          transition: 'opacity 700ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
 
@@ -2045,7 +2047,7 @@ export default function App() {
           {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
           <div
             ref={panelRef}
-            className={`absolute left-[88px] top-1/2 w-[280px] bg-[#181818] flex flex-col rounded-2xl overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            className={`absolute left-[88px] top-1/2 w-[280px] bg-[#181818] flex flex-col rounded-[20px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
               }`}
             style={{
               maxHeight: 'calc(100% - 16px)',
@@ -2065,16 +2067,16 @@ export default function App() {
             <div className="flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2">
 
               {/* PRESETS SECTION */}
-              <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+              <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
                 <label className="text-[11px] font-semibold text-white mb-2 block">Presets</label>
-                <div className="flex gap-1">
+                <div className="flex justify-between">
                   {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
                     const isActive = format === key;
                     return (
                       <button
                         key={key}
                         onClick={() => { playSwitch(); setFormat(key); }}
-                        className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg transition-colors duration-200 ${isActive
+                        className={`flex flex-col items-center justify-center gap-1.5 rounded-[20px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
                           ? 'bg-[#2a2a2a] text-white'
                           : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
                           }`}
@@ -2088,16 +2090,16 @@ export default function App() {
               </div>
 
               {/* COLOR THEME SECTION */}
-              <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+              <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
                 <label className="text-[11px] font-semibold text-white mb-2 block">Color Theme</label>
-                <div className="flex gap-1">
+                <div className="flex justify-between">
                   {Object.entries(THEMES).map(([key, t]) => {
                     const isActive = colorTheme === key;
                     return (
                       <button
                         key={key}
                         onClick={() => { playSwitch(); setColorTheme(key); }}
-                        className={`flex-1 flex flex-col items-center justify-center gap-2 px-1 rounded-lg transition-colors duration-200 h-[64px] ${isActive
+                        className={`flex flex-col items-center justify-center gap-2 px-1 rounded-[20px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
                           ? 'bg-[#2a2a2a]'
                           : 'bg-transparent hover:bg-[#252525]'
                           }`}
@@ -2127,7 +2129,7 @@ export default function App() {
               {/* CLASSIC MODE CONTROLS (Pattern only) */}
               {activeTab === 'neonPattern' && (
                 <>
-                  <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                  <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
                     <DirectionPad
                       label="Dot Direction"
                       direction={direction}
@@ -2135,7 +2137,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                  <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
                     <Slider
                       label="Thickness"
                       min={0.5} max={5} step={0.1}
@@ -2153,7 +2155,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                  <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
                     <DirectionPad
                       label="Gradient Pos"
                       direction={gradientPos}
@@ -2166,7 +2168,7 @@ export default function App() {
 
               {/* SHAPE COUNT (Spectrum / Waves / Pulse) */}
               {activeTab !== 'neonPattern' && (
-                <div className="bg-[#1e1e1e] rounded-xl px-3 py-3">
+                <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
                   <Slider
                     label={activeTab === 'glass' ? 'Rings' : 'Columns'}
                     min={activeTab === 'glass' ? 5 : 4}
@@ -2180,7 +2182,7 @@ export default function App() {
               )}
 
               {/* ANIMATION TOGGLE */}
-              <div className="bg-[#1e1e1e] rounded-xl px-3 py-1">
+              <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-1">
                 <Switch
                   label="Animate Effect"
                   checked={isAnimated}
@@ -2243,10 +2245,10 @@ export default function App() {
                     <button
                       key={key}
                       onClick={() => { playSwitch(); setColorTheme(key); }}
-                      className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#181818]'}`}
-                      style={{ width: 80, height: 80 }}
+                      className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#252525]'}`}
+                      style={{ width: 70, height: 70 }}
                     >
-                      <div key={isActive ? 'a' : 'i'} className={`flex flex-col items-center gap-2 ${isActive ? 'theme-fade-in' : ''}`}>
+                      <div className="flex flex-col items-center gap-2">
                         {dots}
                         <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${isActive ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>{label}</span>
                       </div>
