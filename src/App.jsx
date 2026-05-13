@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Square, DeviceMobile, Desktop, DownloadSimple, FilmStrip, IconContext } from '@phosphor-icons/react';
+import { Square, DeviceMobile, Desktop, ArrowCircleDown, IconContext } from '@phosphor-icons/react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
@@ -33,6 +33,76 @@ const THEMES = {
     preview: ['#00545F', '#D6FB00', '#ECFFB6'],
   },
 };
+
+// Brand-inspired curated palettes for the Random theme button. Each is hand-picked
+// so the dark bg + 2 gradient stops stay visually consistent (technology, social,
+// medical, finance, etc.) instead of producing chaotic random hex values.
+const RANDOM_PALETTES = [
+  { label: 'Apple',     bg: '#0B0F1A', gradientStart: '#0A84FF', gradientMid: '#5856D6', gradientEnd: '#64D2FF' },
+  { label: 'Meta',      bg: '#0B1F3D', gradientStart: '#1877F2', gradientMid: '#845EE5', gradientEnd: '#00C6FF' },
+  { label: 'Instagram', bg: '#1F0C29', gradientStart: '#833AB4', gradientMid: '#E1306C', gradientEnd: '#FCAF45' },
+  { label: 'Spotify',   bg: '#0A1F0F', gradientStart: '#1DB954', gradientMid: '#B4FF39', gradientEnd: '#A0F0BC' },
+  { label: 'Slack',     bg: '#1A0A2E', gradientStart: '#E01E5A', gradientMid: '#36C5F0', gradientEnd: '#ECB22E' },
+  { label: 'Twitch',    bg: '#160A2E', gradientStart: '#6441A5', gradientMid: '#FF4DA6', gradientEnd: '#BF94FF' },
+  { label: 'Stripe',    bg: '#0A1733', gradientStart: '#635BFF', gradientMid: '#00C8FF', gradientEnd: '#00FFB3' },
+  { label: 'Sunset',    bg: '#2D0F2E', gradientStart: '#FF1B6B', gradientMid: '#FF9F45', gradientEnd: '#FFD93D' },
+  { label: 'Ocean',     bg: '#001D3D', gradientStart: '#003566', gradientMid: '#0077B6', gradientEnd: '#00C9FF' },
+  { label: 'Aurora',    bg: '#0B1426', gradientStart: '#5C6BC0', gradientMid: '#00E5BC', gradientEnd: '#FF6F9C' },
+  { label: 'Volcano',   bg: '#1F0A05', gradientStart: '#D32F2F', gradientMid: '#FF5722', gradientEnd: '#FFD740' },
+  { label: 'Lavender',  bg: '#1A0B2E', gradientStart: '#7B2CBF', gradientMid: '#FF7AC6', gradientEnd: '#C77DFF' },
+  { label: 'Cyber',     bg: '#0A0A23', gradientStart: '#FF00FF', gradientMid: '#A100FF', gradientEnd: '#00FFFF' },
+  { label: 'Forest',    bg: '#0E1F12', gradientStart: '#1B5E20', gradientMid: '#66BB6A', gradientEnd: '#DCEDC8' },
+  { label: 'Rose',      bg: '#2C0B14', gradientStart: '#FF1744', gradientMid: '#FF7A1F', gradientEnd: '#FFD93D' },
+  { label: 'Medical',   bg: '#062B26', gradientStart: '#00BFA5', gradientMid: '#80E27E', gradientEnd: '#B2FFDA' },
+  { label: 'Finance',   bg: '#1A1305', gradientStart: '#7B5E10', gradientMid: '#C9A227', gradientEnd: '#FFD700' },
+  { label: 'Rose Gold', bg: '#1F1014', gradientStart: '#B76A6A', gradientMid: '#E0B97A', gradientEnd: '#FFDAB9' },
+  { label: 'Mint',      bg: '#04221F', gradientStart: '#00C9A7', gradientMid: '#4DD0E1', gradientEnd: '#A8FFD5' },
+  { label: 'Berry',     bg: '#1A0420', gradientStart: '#6A1B9A', gradientMid: '#F06292', gradientEnd: '#FFAB91' },
+];
+
+// Small HSL jitter helper so a random palette gets unique variation each click
+// while still feeling cohesive (no hue jumps, no muddy values).
+const hexToHsl = (hex) => {
+  const m = hex.replace('#', '');
+  const r = parseInt(m.slice(0, 2), 16) / 255;
+  const g = parseInt(m.slice(2, 4), 16) / 255;
+  const b = parseInt(m.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0; const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      default: h = (r - g) / d + 4;
+    }
+    h *= 60;
+  }
+  return [h, s * 100, l * 100];
+};
+const hslToHex = (h, s, l) => {
+  h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(100, s)) / 100; l = Math.max(0, Math.min(100, l)) / 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(c * 255).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+};
+const jitter = (hex, dH, dS, dL) => {
+  const [h, s, l] = hexToHsl(hex);
+  const r = () => (Math.random() * 2 - 1);
+  return hslToHex(h + r() * dH, s + r() * dS, l + r() * dL);
+};
+const jitterPalette = (p) => ({
+  label: p.label,
+  bg: jitter(p.bg, 8, 6, 3),
+  gradientStart: jitter(p.gradientStart, 12, 8, 5),
+  gradientMid: p.gradientMid ? jitter(p.gradientMid, 13, 9, 5) : undefined,
+  gradientEnd: jitter(p.gradientEnd, 14, 10, 6),
+});
 
 const FORMATS = {
   post: { width: 1080, height: 1350, label: "Post", icon: Square },
@@ -424,7 +494,7 @@ const Loader = ({ onDone, onFadeStart }) => {
           flexShrink: 0,
           background: '#052825',
           padding: 44,
-          borderRadius: 20,
+          borderRadius: 16,
           boxShadow: '0 4px 116px rgba(0,0,0,0.24)',
           transformStyle: 'preserve-3d',
           willChange: 'transform',
@@ -433,7 +503,7 @@ const Loader = ({ onDone, onFadeStart }) => {
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full block pointer-events-none"
-          style={{ borderRadius: 20 }}
+          style={{ borderRadius: 16 }}
         />
         <div
           className="absolute inset-0 pointer-events-none"
@@ -510,7 +580,7 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
   const lastPlayRef = useRef(0);
   return (
     <div className="flex flex-col gap-1 mb-1 last:mb-0">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center" style={{ marginBottom: 6 }}>
         <label className="text-[11px] font-medium text-white">{label}</label>
         <span className="text-[11px] text-[#666] font-mono tabular-nums">{formatValue(value)}</span>
       </div>
@@ -609,6 +679,7 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [loaderDone, setLoaderDone] = useState(false);
   const [shapeCount, setShapeCount] = useState(9);
+  const [customTheme, setCustomTheme] = useState(null);
 
   // Preload all UI sounds on first paint
   useEffect(() => {
@@ -789,10 +860,10 @@ export default function App() {
     dotsCacheRef.current = null;
   }, [format]);
 
-  const stateRef = useRef({ direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount });
+  const stateRef = useRef({ direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme });
   useEffect(() => {
-    stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount };
-  }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount]);
+    stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme };
+  }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme]);
 
   // Reset intro animation when changing tabs or main UI becomes visible
   useEffect(() => {
@@ -812,23 +883,21 @@ export default function App() {
   // on every browser, no canvas ctx.filter dependency). Sprite size matches the
   // current format's largest dimension so per-frame drawImage scaling stays
   // close to 1:1 — no pixelation when stretched to the blob's rx/ry.
-  const getBlobSprite = (gradStart, gradEnd, format) => {
-    const key = `${gradStart}|${gradEnd}|${format}`;
+  const getBlobSprite = (gradStart, gradEnd, format, gradMid) => {
+    const key = `${gradStart}|${gradMid || ''}|${gradEnd}|${format}`;
     if (blobSpriteRef.current[key]) return blobSpriteRef.current[key];
     const { width, height } = FORMATS[format] || FORMATS.post;
     const SS = Math.max(width, height);
-    const blurSD = SS * 0.157; // matches original ctx.filter blur(170px) on 1080-canvas
+    const blurSD = SS * 0.157;
 
-    // Rasterize the SVG to an OffscreenCanvas at high resolution (2x the
-    // expected max blob diameter) so per-frame drawImage downscales to the
-    // target → sharper than the browser's default SVG raster cache.
     const rasterPx = Math.min(2048, Math.round(SS * 1.5));
     const cacheCanvas = document.createElement('canvas');
     cacheCanvas.width = rasterPx;
     cacheCanvas.height = rasterPx;
     blobSpriteRef.current[key] = { canvas: cacheCanvas, ready: false };
 
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${rasterPx}' height='${rasterPx}' viewBox='0 0 ${SS} ${SS}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${gradStart}'/><stop offset='80.46%' stop-color='${gradEnd}'/></linearGradient><filter id='b' x='-100%' y='-100%' width='300%' height='300%'><feGaussianBlur stdDeviation='${blurSD.toFixed(1)}'/></filter></defs><ellipse cx='${SS / 2}' cy='${SS / 2}' rx='${SS / 2 * 0.7}' ry='${SS / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
+    const midStop = gradMid ? `<stop offset='50%' stop-color='${gradMid}'/>` : '';
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${rasterPx}' height='${rasterPx}' viewBox='0 0 ${SS} ${SS}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${gradStart}'/>${midStop}<stop offset='80.46%' stop-color='${gradEnd}'/></linearGradient><filter id='b' x='-100%' y='-100%' width='300%' height='300%'><feGaussianBlur stdDeviation='${blurSD.toFixed(1)}'/></filter></defs><ellipse cx='${SS / 2}' cy='${SS / 2}' rx='${SS / 2 * 0.7}' ry='${SS / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
     const img = new Image();
     img.onload = () => {
       const cctx = cacheCanvas.getContext('2d');
@@ -839,9 +908,9 @@ export default function App() {
     return blobSpriteRef.current[key];
   };
 
-  const drawBlurredGradientEllipse = (ctx, mainW, mainH, cx, cy, rx, ry, gradStart, gradEnd, alpha) => {
+  const drawBlurredGradientEllipse = (ctx, mainW, mainH, cx, cy, rx, ry, gradStart, gradEnd, alpha, gradMid) => {
     const fmt = stateRef.current.format;
-    const sprite = getBlobSprite(gradStart, gradEnd, fmt);
+    const sprite = getBlobSprite(gradStart, gradEnd, fmt, gradMid);
     if (sprite.ready) {
       ctx.globalAlpha = alpha;
       ctx.drawImage(sprite.canvas, cx - rx, cy - ry, rx * 2, ry * 2);
@@ -870,7 +939,7 @@ export default function App() {
 
   // --- SPECTRUM DRAWING LOGIC ---
   const drawSpectrum = (ctx, width, height, time, state, elapsed) => {
-    const theme = THEMES[state.colorTheme] || THEMES.neon;
+    const theme = state.customTheme || THEMES[state.colorTheme] || THEMES.neon;
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, width, height);
 
@@ -924,7 +993,7 @@ export default function App() {
       const scaledRx = rx * gradScale;
       const scaledRy = ry * gradScale;
 
-      drawBlurredGradientEllipse(ctx, width, height, blobX, blobY, scaledRx, scaledRy, theme.gradientStart, theme.gradientEnd, pColFade);
+      drawBlurredGradientEllipse(ctx, width, height, blobX, blobY, scaledRx, scaledRy, theme.gradientStart, theme.gradientEnd, pColFade, theme.gradientMid);
 
       ctx.restore();
 
@@ -988,7 +1057,7 @@ export default function App() {
 
   // --- WAVES DRAWING LOGIC (Deformed Spectrum) ---
   const drawWaves = (ctx, width, height, time, state, elapsed) => {
-    const theme = THEMES[state.colorTheme] || THEMES.neon;
+    const theme = state.customTheme || THEMES[state.colorTheme] || THEMES.neon;
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, width, height);
 
@@ -1086,7 +1155,7 @@ export default function App() {
       const scaledRx = rx * gradScale;
       const scaledRy = ry * gradScale;
 
-      drawBlurredGradientEllipse(ctx, width, height, blobX, blobY, scaledRx, scaledRy, theme.gradientStart, theme.gradientEnd, pColFade);
+      drawBlurredGradientEllipse(ctx, width, height, blobX, blobY, scaledRx, scaledRy, theme.gradientStart, theme.gradientEnd, pColFade, theme.gradientMid);
 
       ctx.restore();
 
@@ -1153,7 +1222,7 @@ export default function App() {
 
   // --- PULSE DRAWING LOGIC (centred concentric ring sectors — circular variant of Waves) ---
   const drawGlass = (ctx, width, height, time, state, elapsed) => {
-    const theme = THEMES[state.colorTheme] || THEMES.neon;
+    const theme = state.customTheme || THEMES[state.colorTheme] || THEMES.neon;
 
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, width, height);
@@ -1223,7 +1292,7 @@ export default function App() {
       drawBlurredGradientEllipse(
         ctx, width, height,
         blobX, blobY, scaledRx, scaledRy,
-        theme.gradientStart, theme.gradientEnd, pColFade
+        theme.gradientStart, theme.gradientEnd, pColFade, theme.gradientMid
       );
 
       ctx.restore();
@@ -1330,7 +1399,7 @@ export default function App() {
 
 
     // 1. Base background
-    const theme = THEMES[state.colorTheme] || THEMES.neon;
+    const theme = state.customTheme || THEMES[state.colorTheme] || THEMES.neon;
     ctx.fillStyle = theme.bg;
     ctx.fillRect(0, 0, width, height);
 
@@ -1574,7 +1643,7 @@ export default function App() {
   // --- EXPORT SVG ---
   const handleExportSVG = () => {
     const state = stateRef.current;
-    const theme = THEMES[state.colorTheme] || THEMES.neon;
+    const theme = state.customTheme || THEMES[state.colorTheme] || THEMES.neon;
     const { width, height } = FORMATS[state.format];
     const FADE_OUT_POINT = 0.60;
 
@@ -1812,6 +1881,7 @@ export default function App() {
           </filter>
           <linearGradient id="blobGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="15.29%" stop-color="${theme.gradientStart}" />
+            ${theme.gradientMid ? `<stop offset="50%" stop-color="${theme.gradientMid}" />` : ''}
             <stop offset="80.46%" stop-color="${theme.gradientEnd}" />
           </linearGradient>
           <linearGradient id="borderGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -1995,29 +2065,29 @@ export default function App() {
           <h1 className="text-[15px] font-bold tracking-tight text-white">Neon Theme Creator</h1>
           <div className="flex gap-2">
             <button
-              onClick={handleExportSVG}
+              onClick={() => { playSwitch(); handleExportSVG(); }}
               disabled={isRecording}
               className="flex items-center gap-2 px-4 py-2 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-full transition-colors duration-200 font-medium text-[12px] disabled:opacity-50"
             >
-              <DownloadSimple className="w-3.5 h-3.5" />
+              <ArrowCircleDown className="w-3.5 h-3.5" />
               Export SVG
             </button>
             <button
-              onClick={handleExportVideo}
+              onClick={() => { playSwitch(); handleExportVideo(); }}
               disabled={isRecording}
               className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
-                ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                ? 'bg-[#2a2a2a] text-[#999]'
                 : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
                 }`}
             >
               {isRecording ? (
                 <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  Recording...
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#999] animate-pulse" />
+                  Downloading...
                 </>
               ) : (
                 <>
-                  <FilmStrip className="w-3.5 h-3.5" />
+                  <ArrowCircleDown className="w-3.5 h-3.5" />
                   Export Video (MP4)
                 </>
               )}
@@ -2052,7 +2122,7 @@ export default function App() {
           {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
           <div
             ref={panelRef}
-            className={`absolute left-[88px] top-1/2 w-[280px] bg-[#181818] flex flex-col rounded-[20px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            className={`absolute left-[88px] top-1/2 w-[280px] bg-[#181818] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
               }`}
             style={{
               maxHeight: 'calc(100% - 16px)',
@@ -2072,7 +2142,7 @@ export default function App() {
             <div className="panel-scroll flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2 flex-1 min-h-0">
 
               {/* PRESETS SECTION */}
-              <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
+              <div className="bg-[#1e1e1e] rounded-[16px] p-3">
                 <label className="text-[11px] font-semibold text-white mb-2 block">Presets</label>
                 <div className="flex justify-between">
                   {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
@@ -2081,7 +2151,7 @@ export default function App() {
                       <button
                         key={key}
                         onClick={() => { playSwitch(); setFormat(key); }}
-                        className={`flex flex-col items-center justify-center gap-1.5 rounded-[20px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
+                        className={`flex flex-col items-center justify-center gap-1.5 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
                           ? 'bg-[#2a2a2a] text-white'
                           : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
                           }`}
@@ -2095,7 +2165,7 @@ export default function App() {
               </div>
 
               {/* COLOR THEME SECTION */}
-              <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
+              <div className="bg-[#1e1e1e] rounded-[16px] p-3">
                 <label className="text-[11px] font-semibold text-white mb-2 block">Color Theme</label>
                 <div className="flex justify-between">
                   {Object.entries(THEMES).map(([key, t]) => {
@@ -2103,8 +2173,8 @@ export default function App() {
                     return (
                       <button
                         key={key}
-                        onClick={() => { playSwitch(); setColorTheme(key); }}
-                        className={`flex flex-col items-center justify-center gap-2 px-1 rounded-[20px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
+                        onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
+                        className={`flex flex-col items-center justify-center gap-2 px-1 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
                           ? 'bg-[#2a2a2a]'
                           : 'bg-transparent hover:bg-[#252525]'
                           }`}
@@ -2134,7 +2204,7 @@ export default function App() {
               {/* CLASSIC MODE CONTROLS (Pattern only) */}
               {activeTab === 'neonPattern' && (
                 <>
-                  <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
+                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
                     <DirectionPad
                       label="Dot Direction"
                       direction={direction}
@@ -2142,7 +2212,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
+                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
                     <Slider
                       label="Thickness"
                       min={0.5} max={5} step={0.1}
@@ -2160,7 +2230,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
+                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
                     <DirectionPad
                       label="Gradient Pos"
                       direction={gradientPos}
@@ -2173,7 +2243,7 @@ export default function App() {
 
               {/* SHAPE COUNT (Spectrum / Waves / Pulse) */}
               {activeTab !== 'neonPattern' && (
-                <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-3">
+                <div className="bg-[#1e1e1e] rounded-[16px] p-3">
                   <Slider
                     label={activeTab === 'glass' ? 'Rings' : 'Columns'}
                     min={activeTab === 'glass' ? 5 : 4}
@@ -2187,7 +2257,7 @@ export default function App() {
               )}
 
               {/* ANIMATION TOGGLE */}
-              <div className="bg-[#1e1e1e] rounded-[20px] px-3 py-1">
+              <div className="bg-[#1e1e1e] rounded-[16px] p-3">
                 <Switch
                   label="Animate Effect"
                   checked={isAnimated}
@@ -2220,7 +2290,7 @@ export default function App() {
                   willChange: 'transform',
                 }}
               >
-                <canvas ref={canvasRef} className="block w-full h-full transition-all" style={{ borderRadius: 20 }} />
+                <canvas ref={canvasRef} className="block w-full h-full transition-all" style={{ borderRadius: 16 }} />
               </div>
 
               {/* THEME SELECTOR — vertical on right of canvas. Active = gray
@@ -2228,7 +2298,7 @@ export default function App() {
                   current tab label; inactive = dots + theme label only. */}
               <div className="absolute left-full top-0 flex flex-col" style={{ gap: 13, marginLeft: 13 }}>
                 {Object.entries(THEMES).map(([key, t]) => {
-                  const isActive = colorTheme === key;
+                  const isActive = colorTheme === key && !customTheme;
                   const label = t.label;
                   const dots = (
                     <div className="flex">
@@ -2249,8 +2319,8 @@ export default function App() {
                   return (
                     <button
                       key={key}
-                      onClick={() => { playSwitch(); setColorTheme(key); }}
-                      className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#252525]'}`}
+                      onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
+                      className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#1e1e1e]'}`}
                       style={{ width: 70, height: 70 }}
                     >
                       <div className="flex flex-col items-center gap-2">
@@ -2260,6 +2330,43 @@ export default function App() {
                     </button>
                   );
                 })}
+
+                {/* RANDOM THEME — picks a curated brand-inspired palette */}
+                <button
+                  onClick={() => {
+                    playSwitch();
+                    const base = RANDOM_PALETTES[Math.floor(Math.random() * RANDOM_PALETTES.length)];
+                    const j = jitterPalette(base);
+                    setCustomTheme({
+                      label: j.label,
+                      bg: j.bg,
+                      gradientStart: j.gradientStart,
+                      gradientMid: j.gradientMid,
+                      gradientEnd: j.gradientEnd,
+                      preview: [j.gradientStart, j.gradientMid || j.gradientEnd, j.gradientEnd],
+                    });
+                  }}
+                  className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${customTheme ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#1e1e1e]'}`}
+                  style={{ width: 70, height: 70 }}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex">
+                      {(customTheme ? customTheme.preview : ['#3a3a3a', '#5a5a5a', '#8a8a8a']).map((c, i) => (
+                        <div
+                          key={i}
+                          className="w-3.5 h-3.5 rounded-full"
+                          style={{
+                            backgroundColor: c,
+                            marginLeft: i === 0 ? 0 : -2,
+                            zIndex: 3 - i,
+                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${customTheme ? `, 0 0 6px ${c}66` : ''}`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${customTheme ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>Random</span>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
