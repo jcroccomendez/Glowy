@@ -4,7 +4,7 @@ import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
 // --- CONFIGURATION AND UTILITIES ---
-const APP_BG = '#131413'; // Unified general app background
+const APP_BG = '#121212ff'; // Unified general app background
 const IS_MOBILE = typeof window !== 'undefined' && (('ontouchstart' in window) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
 const MOBILE_DPR = 1;
 const MOBILE_FPS = 30;
@@ -38,26 +38,26 @@ const THEMES = {
 // so the dark bg + 2 gradient stops stay visually consistent (technology, social,
 // medical, finance, etc.) instead of producing chaotic random hex values.
 const RANDOM_PALETTES = [
-  { label: 'Apple',     bg: '#0B0F1A', gradientStart: '#0A84FF', gradientMid: '#5856D6', gradientEnd: '#64D2FF' },
-  { label: 'Meta',      bg: '#0B1F3D', gradientStart: '#1877F2', gradientMid: '#845EE5', gradientEnd: '#00C6FF' },
+  { label: 'Apple', bg: '#0B0F1A', gradientStart: '#0A84FF', gradientMid: '#5856D6', gradientEnd: '#64D2FF' },
+  { label: 'Meta', bg: '#0B1F3D', gradientStart: '#1877F2', gradientMid: '#845EE5', gradientEnd: '#00C6FF' },
   { label: 'Instagram', bg: '#1F0C29', gradientStart: '#833AB4', gradientMid: '#E1306C', gradientEnd: '#FCAF45' },
-  { label: 'Spotify',   bg: '#0A1F0F', gradientStart: '#1DB954', gradientMid: '#B4FF39', gradientEnd: '#A0F0BC' },
-  { label: 'Slack',     bg: '#1A0A2E', gradientStart: '#E01E5A', gradientMid: '#36C5F0', gradientEnd: '#ECB22E' },
-  { label: 'Twitch',    bg: '#160A2E', gradientStart: '#6441A5', gradientMid: '#FF4DA6', gradientEnd: '#BF94FF' },
-  { label: 'Stripe',    bg: '#0A1733', gradientStart: '#635BFF', gradientMid: '#00C8FF', gradientEnd: '#00FFB3' },
-  { label: 'Sunset',    bg: '#2D0F2E', gradientStart: '#FF1B6B', gradientMid: '#FF9F45', gradientEnd: '#FFD93D' },
-  { label: 'Ocean',     bg: '#001D3D', gradientStart: '#003566', gradientMid: '#0077B6', gradientEnd: '#00C9FF' },
-  { label: 'Aurora',    bg: '#0B1426', gradientStart: '#5C6BC0', gradientMid: '#00E5BC', gradientEnd: '#FF6F9C' },
-  { label: 'Volcano',   bg: '#1F0A05', gradientStart: '#D32F2F', gradientMid: '#FF5722', gradientEnd: '#FFD740' },
-  { label: 'Lavender',  bg: '#1A0B2E', gradientStart: '#7B2CBF', gradientMid: '#FF7AC6', gradientEnd: '#C77DFF' },
-  { label: 'Cyber',     bg: '#0A0A23', gradientStart: '#FF00FF', gradientMid: '#A100FF', gradientEnd: '#00FFFF' },
-  { label: 'Forest',    bg: '#0E1F12', gradientStart: '#1B5E20', gradientMid: '#66BB6A', gradientEnd: '#DCEDC8' },
-  { label: 'Rose',      bg: '#2C0B14', gradientStart: '#FF1744', gradientMid: '#FF7A1F', gradientEnd: '#FFD93D' },
-  { label: 'Medical',   bg: '#062B26', gradientStart: '#00BFA5', gradientMid: '#80E27E', gradientEnd: '#B2FFDA' },
-  { label: 'Finance',   bg: '#1A1305', gradientStart: '#7B5E10', gradientMid: '#C9A227', gradientEnd: '#FFD700' },
+  { label: 'Spotify', bg: '#0A1F0F', gradientStart: '#1DB954', gradientMid: '#B4FF39', gradientEnd: '#A0F0BC' },
+  { label: 'Slack', bg: '#1A0A2E', gradientStart: '#E01E5A', gradientMid: '#36C5F0', gradientEnd: '#ECB22E' },
+  { label: 'Twitch', bg: '#160A2E', gradientStart: '#6441A5', gradientMid: '#FF4DA6', gradientEnd: '#BF94FF' },
+  { label: 'Stripe', bg: '#0A1733', gradientStart: '#635BFF', gradientMid: '#00C8FF', gradientEnd: '#00FFB3' },
+  { label: 'Sunset', bg: '#2D0F2E', gradientStart: '#FF1B6B', gradientMid: '#FF9F45', gradientEnd: '#FFD93D' },
+  { label: 'Ocean', bg: '#001D3D', gradientStart: '#003566', gradientMid: '#0077B6', gradientEnd: '#00C9FF' },
+  { label: 'Aurora', bg: '#0B1426', gradientStart: '#5C6BC0', gradientMid: '#00E5BC', gradientEnd: '#FF6F9C' },
+  { label: 'Volcano', bg: '#1F0A05', gradientStart: '#D32F2F', gradientMid: '#FF5722', gradientEnd: '#FFD740' },
+  { label: 'Lavender', bg: '#1A0B2E', gradientStart: '#7B2CBF', gradientMid: '#FF7AC6', gradientEnd: '#C77DFF' },
+  { label: 'Cyber', bg: '#0A0A23', gradientStart: '#FF00FF', gradientMid: '#A100FF', gradientEnd: '#00FFFF' },
+  { label: 'Forest', bg: '#0E1F12', gradientStart: '#1B5E20', gradientMid: '#66BB6A', gradientEnd: '#DCEDC8' },
+  { label: 'Rose', bg: '#2C0B14', gradientStart: '#FF1744', gradientMid: '#FF7A1F', gradientEnd: '#FFD93D' },
+  { label: 'Medical', bg: '#062B26', gradientStart: '#00BFA5', gradientMid: '#80E27E', gradientEnd: '#B2FFDA' },
+  { label: 'Finance', bg: '#1A1305', gradientStart: '#7B5E10', gradientMid: '#C9A227', gradientEnd: '#FFD700' },
   { label: 'Rose Gold', bg: '#1F1014', gradientStart: '#B76A6A', gradientMid: '#E0B97A', gradientEnd: '#FFDAB9' },
-  { label: 'Mint',      bg: '#04221F', gradientStart: '#00C9A7', gradientMid: '#4DD0E1', gradientEnd: '#A8FFD5' },
-  { label: 'Berry',     bg: '#1A0420', gradientStart: '#6A1B9A', gradientMid: '#F06292', gradientEnd: '#FFAB91' },
+  { label: 'Mint', bg: '#04221F', gradientStart: '#00C9A7', gradientMid: '#4DD0E1', gradientEnd: '#A8FFD5' },
+  { label: 'Berry', bg: '#1A0420', gradientStart: '#6A1B9A', gradientMid: '#F06292', gradientEnd: '#FFAB91' },
 ];
 
 // Small HSL jitter helper so a random palette gets unique variation each click
@@ -200,14 +200,12 @@ const NeonplaceLogo = ({ className }) => (
 const Loader = ({ onDone, onFadeStart }) => {
   const canvasRef = useRef(null);
   const cardRef = useRef(null);
-  const creatorRef = useRef(null);
   const mousePosRef = useRef(null);
   const interactRef = useRef({ x: 0, y: 0, weight: 0 });
   const tiltRef = useRef({ trx: 0, tryY: 0, rx: 0, ry: 0 });
   const [progress, setProgress] = useState(0);
   const [shown, setShown] = useState(false);
   const [hiding, setHiding] = useState(false);
-  const [creatorW, setCreatorW] = useState(0);
 
   const handleMouseMove = (e) => {
     const canvas = canvasRef.current;
@@ -252,10 +250,6 @@ const Loader = ({ onDone, onFadeStart }) => {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
-
-  useEffect(() => {
-    if (creatorRef.current) setCreatorW(creatorRef.current.getBoundingClientRect().width);
   }, []);
 
   // Trigger the entry fade after first paint
@@ -512,39 +506,36 @@ const Loader = ({ onDone, onFadeStart }) => {
           }}
         />
         <div
-          className="relative text-white flex flex-col items-start"
+          className="relative text-white"
           style={{
             fontFamily: 'Inter, sans-serif',
-            fontSize: '37.676px',
-            fontWeight: 400,
-            lineHeight: '126%',
+            fontSize: '15px',
+            fontWeight: 700,
+            lineHeight: '1',
           }}
         >
-          <span>Neon</span>
-          <span>Theme</span>
-          <span ref={creatorRef} style={{ display: 'inline-block' }}>Creator</span>
+          Glowy
         </div>
         <div
-          className="relative mt-4 rounded-full overflow-hidden"
-          style={{ width: creatorW || 150, height: 4, backgroundColor: 'rgba(255,255,255,0.12)' }}
+          className="relative text-white mt-3"
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '30px',
+            fontWeight: 300,
+            lineHeight: '120%',
+            display: 'inline-block',
+          }}
+        >
+          Animated gradients.<br />Editable SVG.<br />Zero install.
+        </div>
+        <div
+          className="relative mt-auto rounded-full overflow-hidden"
+          style={{ width: 160, height: 4, backgroundColor: 'rgba(255,255,255,0.12)' }}
         >
           <div
             className="h-full rounded-full transition-[width] duration-100 ease-linear"
             style={{ width: `${progress}%`, backgroundColor: '#00FF48' }}
           />
-        </div>
-        <div
-          className="relative mt-auto"
-          style={{
-            color: '#9CCBC7',
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '11.52px',
-            fontWeight: 400,
-            lineHeight: '17.766px',
-            maxWidth: '32ch',
-          }}
-        >
-          A browser-based generator for animated neon backgrounds — all client-side.
         </div>
       </div>
     </div>
@@ -611,24 +602,24 @@ const Switch = ({ label, checked, onChange, icon }) => {
   const [playClick] = useSound('/sounds/rollover6.ogg', { volume: 0.4 });
   const toggle = () => { playClick(); onChange(!checked); };
   return (
-  <div className="flex items-center justify-between py-1.5">
-    <div className="flex items-center gap-2">
-      {icon && <span className="text-[#666]">{icon}</span>}
-      <label className="text-[12px] font-medium text-white cursor-pointer" onClick={toggle}>
-        {label}
-      </label>
-    </div>
-    <button
-      onClick={toggle}
-      className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[#00FF48]' : 'bg-[#333]'
-        }`}
-    >
-      <span
-        className={`inline-block h-[14px] w-[14px] transform rounded-full transition-transform duration-200 shadow-sm ${checked ? 'translate-x-[18px] bg-[#181818]' : 'translate-x-0.5 bg-[#666]'
+    <div className="flex items-center justify-between py-1.5">
+      <div className="flex items-center gap-2">
+        {icon && <span className="text-[#666]">{icon}</span>}
+        <label className="text-[12px] font-medium text-white cursor-pointer" onClick={toggle}>
+          {label}
+        </label>
+      </div>
+      <button
+        onClick={toggle}
+        className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[#00FF48]' : 'bg-[#333]'
           }`}
-      />
-    </button>
-  </div>
+      >
+        <span
+          className={`inline-block h-[14px] w-[14px] transform rounded-full transition-transform duration-200 shadow-sm ${checked ? 'translate-x-[18px] bg-[#181818]' : 'translate-x-0.5 bg-[#666]'
+            }`}
+        />
+      </button>
+    </div>
   );
 };
 
@@ -680,6 +671,8 @@ export default function App() {
   const [loaderDone, setLoaderDone] = useState(false);
   const [shapeCount, setShapeCount] = useState(9);
   const [customTheme, setCustomTheme] = useState(null);
+  const [showDashed, setShowDashed] = useState(true);
+  const [showNoise, setShowNoise] = useState(true);
 
   // Preload all UI sounds on first paint
   useEffect(() => {
@@ -747,6 +740,7 @@ export default function App() {
   // References (Refs)
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const fadeWrapRef = useRef(null);
   const noiseCanvasRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const introStartTimeRef = useRef(-1);
@@ -860,24 +854,25 @@ export default function App() {
     dotsCacheRef.current = null;
   }, [format]);
 
-  const stateRef = useRef({ direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme });
+  const stateRef = useRef({ direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise });
   useEffect(() => {
-    stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme };
-  }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme]);
+    stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise };
+  }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise]);
 
   // Reset intro animation when changing tabs or main UI becomes visible
   useEffect(() => {
     introStartTimeRef.current = -1;
   }, [activeTab, loaderDone]);
 
-  // Fade-in-up on canvas whenever the format preset, theme, or random theme changes
+  // Fade-in-up on the entire canvas wrapper whenever tab, format, theme,
+  // or random theme changes (animation moves the whole rounded card).
   useEffect(() => {
-    const el = canvasRef.current;
+    const el = fadeWrapRef.current;
     if (!el) return;
     el.classList.remove('canvas-fade-in-up');
     void el.offsetWidth;
     el.classList.add('canvas-fade-in-up');
-  }, [format, colorTheme, customTheme]);
+  }, [activeTab, format, colorTheme, customTheme]);
 
   // Pre-render a blurred linear-gradient ellipse via SVG feGaussianBlur (works
   // on every browser, no canvas ctx.filter dependency). Sprite size matches the
@@ -998,15 +993,15 @@ export default function App() {
       ctx.restore();
 
       // --- DASHED BORDER BETWEEN COLUMNS ---
-      if (i < numCols - 1) {
+      if (state.showDashed !== false && i < numCols - 1) {
         ctx.save();
-        ctx.globalAlpha = pColFade * 0.5; // A bit more transparent
+        ctx.globalAlpha = pColFade * 0.5;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
         const lineGrad = ctx.createLinearGradient(0, 0, 0, height);
         lineGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        lineGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0)'); // Transparency goes lower
+        lineGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0)');
         lineGrad.addColorStop(1, '#FFFFFF');
 
         ctx.strokeStyle = lineGrad;
@@ -1048,7 +1043,7 @@ export default function App() {
       ctx.restore();
     }
 
-    if (noiseCanvasRef.current) {
+    if (state.showNoise !== false && noiseCanvasRef.current) {
       ctx.globalAlpha = 0.05;
       ctx.drawImage(noiseCanvasRef.current, 0, 0, width, height);
       ctx.globalAlpha = 1.0;
@@ -1160,7 +1155,7 @@ export default function App() {
       ctx.restore();
 
       // Dashed border along the right boundary curve
-      if (i < numCols - 1) {
+      if (state.showDashed !== false && i < numCols - 1) {
         ctx.save();
         ctx.globalAlpha = pColFade * 0.5;
         ctx.setLineDash([8, 15]);
@@ -1213,7 +1208,7 @@ export default function App() {
       ctx.restore();
     }
 
-    if (noiseCanvasRef.current) {
+    if (state.showNoise !== false && noiseCanvasRef.current) {
       ctx.globalAlpha = 0.05;
       ctx.drawImage(noiseCanvasRef.current, 0, 0, width, height);
       ctx.globalAlpha = 1.0;
@@ -1299,7 +1294,7 @@ export default function App() {
 
       // Dashed circular border at the inner edge of each visible ring (skip i=0
       // — that would draw a degenerate dot at the corner).
-      if (i > 0 && i <= visibleRings) {
+      if (state.showDashed !== false && i > 0 && i <= visibleRings) {
         ctx.save();
         ctx.globalAlpha = pColFade * 0.5;
         ctx.setLineDash([8, 15]);
@@ -1342,7 +1337,7 @@ export default function App() {
       ctx.restore();
     }
 
-    if (noiseCanvasRef.current) {
+    if (state.showNoise !== false && noiseCanvasRef.current) {
       ctx.globalAlpha = 0.05;
       ctx.drawImage(noiseCanvasRef.current, 0, 0, width, height);
       ctx.globalAlpha = 1.0;
@@ -1572,7 +1567,7 @@ export default function App() {
       ctx.restore();
     }
 
-    if (noiseCanvasRef.current) {
+    if (state.showNoise !== false && noiseCanvasRef.current) {
       ctx.globalAlpha = 0.05;
       ctx.drawImage(noiseCanvasRef.current, 0, 0, width, height);
       ctx.globalAlpha = 1.0;
@@ -2002,7 +1997,7 @@ export default function App() {
     <>
       <style dangerouslySetInnerHTML={{
         __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; margin: 0; background: ${APP_BG}; }
         @keyframes fadeInLeft {
           from { opacity: 0; transform: translateX(-16px); }
@@ -2010,10 +2005,10 @@ export default function App() {
         }
         .tab-fade-in-left { animation: fadeInLeft 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
         @keyframes canvasFadeInUp {
-          from { opacity: 0; transform: translateY(18px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: scale(0.96); }
+          to { opacity: 1; transform: scale(1); }
         }
-        .canvas-fade-in-up { animation: canvasFadeInUp 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .canvas-fade-in-up { animation: canvasFadeInUp 520ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: center bottom; }
         .panel-scroll::-webkit-scrollbar { width: 4px; }
         .panel-scroll::-webkit-scrollbar-track { background: transparent; }
         .panel-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
@@ -2046,333 +2041,355 @@ export default function App() {
       `}} />
 
       <IconContext.Provider value={{ weight: 'duotone' }}>
-      {!loaderDone && (
-        <Loader onDone={() => setLoaderDone(true)} />
-      )}
+        {!loaderDone && (
+          <Loader onDone={() => setLoaderDone(true)} />
+        )}
 
-      <div
-        className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100"
-        style={{
-          backgroundColor: APP_BG,
-          opacity: loaderDone ? 1 : 0,
-          pointerEvents: loaderDone ? 'auto' : 'none',
-          transition: 'opacity 700ms cubic-bezier(0.22, 1, 0.36, 1)',
-        }}
-      >
+        <div
+          className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100"
+          style={{
+            backgroundColor: APP_BG,
+            opacity: loaderDone ? 1 : 0,
+            pointerEvents: loaderDone ? 'auto' : 'none',
+            transition: 'opacity 700ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        >
 
-        {/* TOP BAR */}
-        <header className="flex items-center justify-between px-6 py-4 flex-shrink-0">
-          <h1 className="text-[15px] font-bold tracking-tight text-white">Neon Theme Creator</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => { playSwitch(); handleExportSVG(); }}
-              disabled={isRecording}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-full transition-colors duration-200 font-medium text-[12px] disabled:opacity-50"
-            >
-              <ArrowCircleDown className="w-3.5 h-3.5" />
-              Export SVG
-            </button>
-            <button
-              onClick={() => { playSwitch(); handleExportVideo(); }}
-              disabled={isRecording}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
-                ? 'bg-[#2a2a2a] text-[#999]'
-                : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
-                }`}
-            >
-              {isRecording ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#999] animate-pulse" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <ArrowCircleDown className="w-3.5 h-3.5" />
-                  Export Video (MP4)
-                </>
-              )}
-            </button>
-          </div>
-        </header>
+          {/* TOP BAR */}
+          <header className="flex items-center justify-between px-6 py-4 flex-shrink-0">
+            <h1 className="text-[15px] font-bold tracking-tight text-white">Glowy</h1>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { playSwitch(); handleExportSVG(); }}
+                disabled={isRecording}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-full transition-colors duration-200 font-medium text-[12px] disabled:opacity-50"
+              >
+                <ArrowCircleDown className="w-3.5 h-3.5" />
+                Export SVG
+              </button>
+              <button
+                onClick={() => { playSwitch(); handleExportVideo(); }}
+                disabled={isRecording}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
+                  ? 'bg-[#2a2a2a] text-[#999]'
+                  : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
+                  }`}
+              >
+                {isRecording ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#999] animate-pulse" />
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <ArrowCircleDown className="w-3.5 h-3.5" />
+                    Export Video (MP4)
+                  </>
+                )}
+              </button>
+            </div>
+          </header>
 
-        {/* MAIN AREA — relative so children can be absolutely positioned and centred */}
-        <div className="flex-1 relative px-6 pb-6 overflow-hidden">
+          {/* MAIN AREA — relative so children can be absolutely positioned and centred */}
+          <div className="flex-1 relative px-6 pb-6 overflow-hidden">
 
-          {/* ICON RAIL — vertically centred against the viewport */}
-          <div ref={railRef} className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
-            {TABS.map(({ id, label, Icon }) => {
-              const isActive = activeTab === id;
-              const isOpen = panelOpen;
-              const btn = (
-                <button
-                  onClick={() => { playHover(); handleTabClick(id); }}
-                  aria-label={label}
-                  className={`w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center ${isActive
-                    ? 'bg-[#00FF48] text-[#181818]'
-                    : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
-                    }`}
-                >
-                  <Icon className="w-[95%] h-[95%]" />
-                </button>
-              );
-              return isOpen ? <div key={id}>{btn}</div> : <Tooltip key={id} label={label} side="right">{btn}</Tooltip>;
-            })}
-          </div>
-
-          {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
-          <div
-            ref={panelRef}
-            className={`absolute left-[88px] top-1/2 w-[280px] bg-[#181818] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-              }`}
-            style={{
-              maxHeight: 'calc(100% - 16px)',
-              transform: `translateY(-50%) translateX(${panelOpen ? '0px' : '16px'})`,
-            }}
-          >
-          <div key={activeTab} className="tab-fade-in-left flex flex-col flex-1 min-h-0">
-
-            {/* PANEL TITLE — matches the active tab */}
-            <div className="px-4 pt-4 pb-2">
-              <h2 className="text-[#00FF48] text-[12px] font-bold tracking-tight">
-                {TABS.find((t) => t.id === activeTab)?.label}
-              </h2>
+            {/* ICON RAIL — vertically centred against the viewport */}
+            <div ref={railRef} className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
+              {TABS.map(({ id, label, Icon }) => {
+                const isActive = activeTab === id;
+                const isOpen = panelOpen;
+                const btn = (
+                  <button
+                    onClick={() => { playHover(); handleTabClick(id); }}
+                    aria-label={label}
+                    className={`w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center ${isActive
+                      ? 'bg-[#00FF48] text-[#181818]'
+                      : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
+                      }`}
+                  >
+                    <Icon className="w-[95%] h-[95%]" />
+                  </button>
+                );
+                return isOpen ? <div key={id}>{btn}</div> : <Tooltip key={id} label={label} side="right">{btn}</Tooltip>;
+              })}
             </div>
 
-            {/* CONTROLS — height auto-fits content, scrolls only when overflowing the viewport */}
-            <div className="panel-scroll flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2 flex-1 min-h-0">
+            {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
+            <div
+              ref={panelRef}
+              className={`absolute left-[88px] top-1/2 w-[280px] bg-[#181818] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                }`}
+              style={{
+                maxHeight: 'calc(100% - 16px)',
+                transform: `translateY(-50%) translateX(${panelOpen ? '0px' : '16px'})`,
+              }}
+            >
+              <div key={activeTab} className="tab-fade-in-left flex flex-col flex-1 min-h-0">
 
-              {/* PRESETS SECTION */}
-              <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                <label className="text-[11px] font-semibold text-white mb-2 block">Presets</label>
-                <div className="flex justify-between">
-                  {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
-                    const isActive = format === key;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => { playSwitch(); setFormat(key); }}
-                        className={`flex flex-col items-center justify-center gap-1.5 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
-                          ? 'bg-[#2a2a2a] text-white'
-                          : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
-                          }`}
-                      >
-                        <Icon className="w-5 h-5" />
-                        <span className="text-[11px] font-medium leading-none">{label}</span>
-                      </button>
-                    );
-                  })}
+                {/* PANEL TITLE — matches the active tab */}
+                <div className="px-4 pt-4 pb-2">
+                  <h2 className="text-[#00FF48] text-[12px] font-bold tracking-tight">
+                    {TABS.find((t) => t.id === activeTab)?.label}
+                  </h2>
+                </div>
+
+                {/* CONTROLS — height auto-fits content, scrolls only when overflowing the viewport */}
+                <div className="panel-scroll flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2 flex-1 min-h-0">
+
+                  {/* PRESETS SECTION */}
+                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                    <label className="text-[11px] font-semibold text-white mb-2 block">Presets</label>
+                    <div className="flex justify-between">
+                      {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
+                        const isActive = format === key;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => { playSwitch(); setFormat(key); }}
+                            className={`flex flex-col items-center justify-center gap-1.5 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
+                              ? 'bg-[#2a2a2a] text-white'
+                              : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
+                              }`}
+                          >
+                            <Icon className="w-5 h-5" />
+                            <span className="text-[11px] font-medium leading-none">{label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* COLOR THEME SECTION */}
+                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                    <label className="text-[11px] font-semibold text-white mb-2 block">Color Theme</label>
+                    <div className="flex justify-between">
+                      {Object.entries(THEMES).map(([key, t]) => {
+                        const isActive = colorTheme === key;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
+                            className={`flex flex-col items-center justify-center gap-2 px-1 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
+                              ? 'bg-[#2a2a2a]'
+                              : 'bg-transparent hover:bg-[#252525]'
+                              }`}
+                          >
+                            <div className="flex justify-center">
+                              {t.preview.map((c, i) => (
+                                <div
+                                  key={i}
+                                  className="w-3.5 h-3.5 rounded-full"
+                                  style={{
+                                    backgroundColor: c,
+                                    marginLeft: i === 0 ? 0 : -2,
+                                    zIndex: 3 - i,
+                                    boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <span className={`text-[11px] font-medium text-center leading-none ${isActive ? 'text-white' : 'text-[#666]'
+                              }`}>{t.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* CLASSIC MODE CONTROLS (Pattern only) */}
+                  {activeTab === 'neonPattern' && (
+                    <>
+                      <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                        <DirectionPad
+                          label="Dot Direction"
+                          direction={direction}
+                          onChange={setDirection}
+                        />
+                      </div>
+
+                      <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                        <Slider
+                          label="Thickness"
+                          min={0.5} max={5} step={0.1}
+                          value={dotSize}
+                          onChange={setDotSize}
+                          formatValue={(v) => v.toFixed(1) + 'px'}
+                        />
+                        <div style={{ height: 8 }}></div>
+                        <Slider
+                          label="Density"
+                          min={10} max={60} step={2}
+                          value={dotSpacing}
+                          onChange={setDotSpacing}
+                          formatValue={(v) => v + 'px'}
+                        />
+                      </div>
+
+                      <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                        <DirectionPad
+                          label="Gradient Pos"
+                          direction={gradientPos}
+                          onChange={setGradientPos}
+                          disabledDirs={['left', 'right']}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* SHAPE COUNT (Spectrum / Waves / Pulse) */}
+                  {activeTab !== 'neonPattern' && (
+                    <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                      <Slider
+                        label={activeTab === 'glass' ? 'Rings' : 'Columns'}
+                        min={activeTab === 'glass' ? 5 : 4}
+                        max={activeTab === 'glass' ? 24 : 20}
+                        step={1}
+                        value={shapeCount}
+                        onChange={setShapeCount}
+                        formatValue={(v) => v}
+                      />
+                    </div>
+                  )}
+
+                  {/* ANIMATION TOGGLE */}
+                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                    <Switch
+                      label="Animate Effect"
+                      checked={isAnimated}
+                      onChange={setIsAnimated}
+                    />
+                  </div>
+
+                  {/* DASHED LINES TOGGLE */}
+                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                    <Switch
+                      label="Dashed Lines"
+                      checked={showDashed}
+                      onChange={setShowDashed}
+                    />
+                  </div>
+
+                  {/* NOISE TOGGLE */}
+                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                    <Switch
+                      label="Noise"
+                      checked={showNoise}
+                      onChange={setShowNoise}
+                    />
+                  </div>
+
+
                 </div>
               </div>
+            </div>
 
-              {/* COLOR THEME SECTION */}
-              <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                <label className="text-[11px] font-semibold text-white mb-2 block">Color Theme</label>
-                <div className="flex justify-between">
+            {/* CANVAS PREVIEW — canvas itself is centred (label is absolutely
+              positioned above it so it doesn't shift the centre point) */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="relative pointer-events-auto">
+                <span className="absolute -top-7 left-1 text-[13px] font-semibold text-[#888] select-none">
+                  {FORMATS[format].label}
+                </span>
+                <div ref={fadeWrapRef} style={{ display: 'inline-block' }}>
+                  <div
+                    ref={containerRef}
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
+                    className="relative shadow-2xl overflow-hidden"
+                    style={{
+                      aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
+                      maxHeight: 'calc(100vh - 140px)',
+                      maxWidth: 'calc(100vw - 160px)',
+                      transformStyle: 'preserve-3d',
+                      willChange: 'transform',
+                      borderRadius: 16,
+                      backgroundColor: (customTheme || THEMES[colorTheme] || THEMES.neon).bg,
+                    }}
+                  >
+                    <canvas ref={canvasRef} className="block w-full h-full transition-all" />
+                  </div>
+                </div>
+
+                {/* THEME SELECTOR — vertical on right of canvas. Active = gray
+                  rounded-square container holding both overlapping dots and the
+                  current tab label; inactive = dots + theme label only. */}
+                <div className="absolute left-full top-0 flex flex-col" style={{ gap: 13, marginLeft: 13 }}>
                   {Object.entries(THEMES).map(([key, t]) => {
-                    const isActive = colorTheme === key;
+                    const isActive = colorTheme === key && !customTheme;
+                    const label = t.label;
+                    const dots = (
+                      <div className="flex">
+                        {t.preview.map((c, i) => (
+                          <div
+                            key={i}
+                            className="w-3.5 h-3.5 rounded-full"
+                            style={{
+                              backgroundColor: c,
+                              marginLeft: i === 0 ? 0 : -2,
+                              zIndex: 3 - i,
+                              boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    );
                     return (
                       <button
                         key={key}
                         onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
-                        className={`flex flex-col items-center justify-center gap-2 px-1 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
-                          ? 'bg-[#2a2a2a]'
-                          : 'bg-transparent hover:bg-[#252525]'
-                          }`}
+                        className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#1e1e1e]'}`}
+                        style={{ width: 70, height: 70 }}
                       >
-                        <div className="flex justify-center">
-                          {t.preview.map((c, i) => (
-                            <div
-                              key={i}
-                              className="w-3.5 h-3.5 rounded-full"
-                              style={{
-                                backgroundColor: c,
-                                marginLeft: i === 0 ? 0 : -2,
-                                zIndex: 3 - i,
-                                boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
-                              }}
-                            />
-                          ))}
+                        <div className="flex flex-col items-center gap-2">
+                          {dots}
+                          <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${isActive ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>{label}</span>
                         </div>
-                        <span className={`text-[11px] font-medium text-center leading-none ${isActive ? 'text-white' : 'text-[#666]'
-                          }`}>{t.label}</span>
                       </button>
                     );
                   })}
-                </div>
-              </div>
 
-              {/* CLASSIC MODE CONTROLS (Pattern only) */}
-              {activeTab === 'neonPattern' && (
-                <>
-                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                    <DirectionPad
-                      label="Dot Direction"
-                      direction={direction}
-                      onChange={setDirection}
-                    />
-                  </div>
-
-                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                    <Slider
-                      label="Thickness"
-                      min={0.5} max={5} step={0.1}
-                      value={dotSize}
-                      onChange={setDotSize}
-                      formatValue={(v) => v.toFixed(1) + 'px'}
-                    />
-                    <div style={{ height: 8 }}></div>
-                    <Slider
-                      label="Density"
-                      min={10} max={60} step={2}
-                      value={dotSpacing}
-                      onChange={setDotSpacing}
-                      formatValue={(v) => v + 'px'}
-                    />
-                  </div>
-
-                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                    <DirectionPad
-                      label="Gradient Pos"
-                      direction={gradientPos}
-                      onChange={setGradientPos}
-                      disabledDirs={['left', 'right']}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* SHAPE COUNT (Spectrum / Waves / Pulse) */}
-              {activeTab !== 'neonPattern' && (
-                <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                  <Slider
-                    label={activeTab === 'glass' ? 'Rings' : 'Columns'}
-                    min={activeTab === 'glass' ? 5 : 4}
-                    max={activeTab === 'glass' ? 24 : 20}
-                    step={1}
-                    value={shapeCount}
-                    onChange={setShapeCount}
-                    formatValue={(v) => v}
-                  />
-                </div>
-              )}
-
-              {/* ANIMATION TOGGLE */}
-              <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                <Switch
-                  label="Animate Effect"
-                  checked={isAnimated}
-                  onChange={setIsAnimated}
-                />
-              </div>
-
-
-            </div>
-            </div>
-          </div>
-
-          {/* CANVAS PREVIEW — canvas itself is centred (label is absolutely
-              positioned above it so it doesn't shift the centre point) */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="relative pointer-events-auto">
-              <span className="absolute -top-7 left-1 text-[13px] font-semibold text-[#888] select-none">
-                {FORMATS[format].label}
-              </span>
-              <div
-                ref={containerRef}
-                onMouseMove={handleMouseMove}
-                onMouseLeave={handleMouseLeave}
-                className="relative shadow-2xl rounded-sm overflow-hidden"
-                style={{
-                  aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
-                  maxHeight: 'calc(100vh - 140px)',
-                  maxWidth: 'calc(100vw - 160px)',
-                  transformStyle: 'preserve-3d',
-                  willChange: 'transform',
-                }}
-              >
-                <canvas ref={canvasRef} className="block w-full h-full transition-all" style={{ borderRadius: 16 }} />
-              </div>
-
-              {/* THEME SELECTOR — vertical on right of canvas. Active = gray
-                  rounded-square container holding both overlapping dots and the
-                  current tab label; inactive = dots + theme label only. */}
-              <div className="absolute left-full top-0 flex flex-col" style={{ gap: 13, marginLeft: 13 }}>
-                {Object.entries(THEMES).map(([key, t]) => {
-                  const isActive = colorTheme === key && !customTheme;
-                  const label = t.label;
-                  const dots = (
-                    <div className="flex">
-                      {t.preview.map((c, i) => (
-                        <div
-                          key={i}
-                          className="w-3.5 h-3.5 rounded-full"
-                          style={{
-                            backgroundColor: c,
-                            marginLeft: i === 0 ? 0 : -2,
-                            zIndex: 3 - i,
-                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
-                          }}
-                        />
-                      ))}
-                    </div>
-                  );
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
-                      className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#1e1e1e]'}`}
-                      style={{ width: 70, height: 70 }}
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        {dots}
-                        <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${isActive ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>{label}</span>
+                  {/* RANDOM THEME — picks a curated brand-inspired palette */}
+                  <button
+                    onClick={() => {
+                      playSwitch();
+                      const base = RANDOM_PALETTES[Math.floor(Math.random() * RANDOM_PALETTES.length)];
+                      const j = jitterPalette(base);
+                      setCustomTheme({
+                        label: j.label,
+                        bg: j.bg,
+                        gradientStart: j.gradientStart,
+                        gradientMid: j.gradientMid,
+                        gradientEnd: j.gradientEnd,
+                        preview: [j.gradientStart, j.gradientMid || j.gradientEnd, j.gradientEnd],
+                      });
+                    }}
+                    className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${customTheme ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#1e1e1e]'}`}
+                    style={{ width: 70, height: 70 }}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex">
+                        {(customTheme ? customTheme.preview : ['#3a3a3a', '#5a5a5a', '#8a8a8a']).map((c, i) => (
+                          <div
+                            key={i}
+                            className="w-3.5 h-3.5 rounded-full"
+                            style={{
+                              backgroundColor: c,
+                              marginLeft: i === 0 ? 0 : -2,
+                              zIndex: 3 - i,
+                              boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${customTheme ? `, 0 0 6px ${c}66` : ''}`,
+                            }}
+                          />
+                        ))}
                       </div>
-                    </button>
-                  );
-                })}
-
-                {/* RANDOM THEME — picks a curated brand-inspired palette */}
-                <button
-                  onClick={() => {
-                    playSwitch();
-                    const base = RANDOM_PALETTES[Math.floor(Math.random() * RANDOM_PALETTES.length)];
-                    const j = jitterPalette(base);
-                    setCustomTheme({
-                      label: j.label,
-                      bg: j.bg,
-                      gradientStart: j.gradientStart,
-                      gradientMid: j.gradientMid,
-                      gradientEnd: j.gradientEnd,
-                      preview: [j.gradientStart, j.gradientMid || j.gradientEnd, j.gradientEnd],
-                    });
-                  }}
-                  className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${customTheme ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#1e1e1e]'}`}
-                  style={{ width: 70, height: 70 }}
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex">
-                      {(customTheme ? customTheme.preview : ['#3a3a3a', '#5a5a5a', '#8a8a8a']).map((c, i) => (
-                        <div
-                          key={i}
-                          className="w-3.5 h-3.5 rounded-full"
-                          style={{
-                            backgroundColor: c,
-                            marginLeft: i === 0 ? 0 : -2,
-                            zIndex: 3 - i,
-                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${customTheme ? `, 0 0 6px ${c}66` : ''}`,
-                          }}
-                        />
-                      ))}
+                      <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${customTheme ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>Random</span>
                     </div>
-                    <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${customTheme ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>Random</span>
-                  </div>
-                </button>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
+          </div>
         </div>
-      </div>
       </IconContext.Provider>
     </>
   );
