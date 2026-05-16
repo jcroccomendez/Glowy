@@ -4,7 +4,7 @@ import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
 // --- CONFIGURATION AND UTILITIES ---
-const APP_BG = '#121212ff'; // Unified general app background
+const APP_BG = '#0d0d0d'; // Unified general app background
 const IS_MOBILE = typeof window !== 'undefined' && (('ontouchstart' in window) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
 const MOBILE_DPR = 1;
 const MOBILE_FPS = 30;
@@ -200,6 +200,7 @@ const NeonplaceLogo = ({ className }) => (
 const Loader = ({ onDone, onFadeStart }) => {
   const canvasRef = useRef(null);
   const cardRef = useRef(null);
+  const overlayRef = useRef(null);
   const mousePosRef = useRef(null);
   const interactRef = useRef({ x: 0, y: 0, weight: 0 });
   const tiltRef = useRef({ trx: 0, tryY: 0, rx: 0, ry: 0 });
@@ -281,24 +282,30 @@ const Loader = ({ onDone, onFadeStart }) => {
     off.width = Math.max(1, Math.ceil(W / DOWNSCALE));
     off.height = Math.max(1, Math.ceil(H / DOWNSCALE));
 
-    const NEON = { bg: '#052825', gradStart: '#2482F1', gradEnd: '#00FF48' };
-
-    // Pre-rasterize SVG blob to a high-res offscreen canvas. drawImage from this
-    // canvas downscales (sharp) instead of upscaling SVG raster (blurry).
-    const SS = Math.max(W, H);
-    const RASTER = 1024; // hi-res raster — drawn at ~534px on screen → downscale
-    const spriteCanvas = document.createElement('canvas');
-    spriteCanvas.width = RASTER;
-    spriteCanvas.height = RASTER;
-    let spriteReady = false;
-    const spriteSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='${RASTER}' height='${RASTER}' viewBox='0 0 ${SS} ${SS}'><defs><linearGradient id='g' x1='0' y1='0.5' x2='1' y2='0.5'><stop offset='15.29%' stop-color='${NEON.gradStart}'/><stop offset='80.46%' stop-color='${NEON.gradEnd}'/></linearGradient><filter id='b' x='-100%' y='-100%' width='300%' height='300%'><feGaussianBlur stdDeviation='${(SS * 0.255).toFixed(1)}'/></filter></defs><ellipse cx='${SS / 2}' cy='${SS / 2}' rx='${SS / 2 * 0.7}' ry='${SS / 2 * 0.7}' fill='url(%23g)' filter='url(%23b)'/></svg>`;
-    const spriteImg = new Image();
-    spriteImg.onload = () => {
-      const sctx = spriteCanvas.getContext('2d');
-      sctx.drawImage(spriteImg, 0, 0, RASTER, RASTER);
-      spriteReady = true;
+    // Cycle through default themes + a sample of brand-inspired random palettes
+    // during the loader. Each slot holds for a moment then quick-fades to the
+    // next so the color shift is unmistakable while the progress fills.
+    const randomSample = ['Apple', 'Instagram', 'Spotify', 'Sunset', 'Aurora', 'Cyber', 'Mint']
+      .map((n) => RANDOM_PALETTES.find((p) => p.label === n))
+      .filter(Boolean)
+      .map((p) => ({ bg: p.bg, gradientStart: p.gradientStart, gradientEnd: p.gradientEnd }));
+    // Force the first cycle slot to read clearly green so the intro opens with
+    // Neon's signature color instead of the blue gradient stop dominating.
+    const cycleNeon = {
+      ...THEMES.neon,
+      gradientStart: '#1DB954',
+      gradientEnd: '#00FF48',
     };
-    spriteImg.src = 'data:image/svg+xml;charset=utf-8,' + spriteSvg;
+    const themesCycle = [cycleNeon, THEMES.midnight, THEMES.ember, ...randomSample];
+    const hexToRgb = (h) => {
+      const m = h.replace('#', '');
+      return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
+    };
+    const rgbToHex = ([r, g, b]) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+    const lerpHex = (a, b, t) => {
+      const ra = hexToRgb(a), rb = hexToRgb(b);
+      return rgbToHex([ra[0] + (rb[0] - ra[0]) * t, ra[1] + (rb[1] - ra[1]) * t, ra[2] + (rb[2] - ra[2]) * t]);
+    };
 
     // Noise tile (same look as the main canvas's noise overlay).
     const noiseSize = 256;
@@ -316,7 +323,10 @@ const Loader = ({ onDone, onFadeStart }) => {
 
     let raf;
     const startTime = performance.now();
+    const SLOT_MS = 1200;
+    const FADE_MS = 300;
     const draw = (time) => {
+     try {
       const elapsed = time - startTime;
       const mPos = mousePosRef.current;
       if (mPos) {
@@ -326,9 +336,30 @@ const Loader = ({ onDone, onFadeStart }) => {
       } else {
         interactRef.current.weight += (0 - interactRef.current.weight) * 0.2;
       }
+
+      // Theme cycling: hold each theme purely for SLOT_MS then crossfade
+      // for FADE_MS into the next. Each segment = SLOT_MS + FADE_MS.
+      const SEG_MS = SLOT_MS + FADE_MS;
+      const slot = Math.floor(elapsed / SEG_MS);
+      const segElapsed = elapsed - slot * SEG_MS;
+      const idxA = slot % themesCycle.length;
+      const idxB = (slot + 1) % themesCycle.length;
+      const inFade = segElapsed > SLOT_MS;
+      const blend = inFade ? (segElapsed - SLOT_MS) / FADE_MS : 0;
+      const themeA = themesCycle[idxA];
+      const themeB = themesCycle[idxB];
+      const bgNow = lerpHex(themeA.bg, themeB.bg, blend);
+
       const offS = off.width / W;
-      ctx.fillStyle = NEON.bg;
+      ctx.fillStyle = bgNow;
       ctx.fillRect(0, 0, W, H);
+
+      // Sync left overlay gradient to the current theme bg color
+      if (overlayRef.current) {
+        const [r, g, b] = hexToRgb(bgNow);
+        const rgb = `${r}, ${g}, ${b}`;
+        overlayRef.current.style.background = `linear-gradient(90deg, rgb(${rgb}) 0%, rgb(${rgb}) 22%, rgba(${rgb},0.98) 32%, rgba(${rgb},0.93) 42%, rgba(${rgb},0.84) 52%, rgba(${rgb},0.7) 62%, rgba(${rgb},0.52) 72%, rgba(${rgb},0.32) 82%, rgba(${rgb},0.14) 92%, rgba(${rgb},0) 100%)`;
+      }
 
       const spectrumCols = 9;
       const colWidth = W / spectrumCols;
@@ -391,28 +422,27 @@ const Loader = ({ onDone, onFadeStart }) => {
         rx *= gradScale;
         ry *= gradScale;
 
-        if (spriteReady) {
-          ctx.globalAlpha = pColFade;
-          ctx.drawImage(spriteCanvas, blobX - rx, blobY - ry, rx * 2, ry * 2);
-          ctx.globalAlpha = 1;
-        } else {
-          offCtx.clearRect(0, 0, off.width, off.height);
-          offCtx.filter = `blur(${170 * offS}px)`;
-          const grad = offCtx.createLinearGradient(
-            (blobX - rx) * offS, blobY * offS,
-            (blobX + rx) * offS, blobY * offS,
-          );
-          grad.addColorStop(0.1529, NEON.gradStart);
-          grad.addColorStop(0.8046, NEON.gradEnd);
-          offCtx.fillStyle = grad;
-          offCtx.beginPath();
-          offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
-          offCtx.fill();
-          offCtx.filter = 'none';
-          ctx.globalAlpha = pColFade;
-          ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
-          ctx.globalAlpha = 1;
-        }
+        // Render blurred gradient ellipse via offscreen ctx.filter blur. Lerped
+        // gradient colors so the cycle transitions remain visible. Reliable
+        // across browsers — no SVG sprite loading dependency.
+        const fbStart = lerpHex(themeA.gradientStart, themeB.gradientStart, blend);
+        const fbEnd = lerpHex(themeA.gradientEnd, themeB.gradientEnd, blend);
+        offCtx.clearRect(0, 0, off.width, off.height);
+        offCtx.filter = `blur(${170 * offS}px)`;
+        const grad = offCtx.createLinearGradient(
+          (blobX - rx) * offS, blobY * offS,
+          (blobX + rx) * offS, blobY * offS,
+        );
+        grad.addColorStop(0.1529, fbStart);
+        grad.addColorStop(0.8046, fbEnd);
+        offCtx.fillStyle = grad;
+        offCtx.beginPath();
+        offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
+        offCtx.fill();
+        offCtx.filter = 'none';
+        ctx.globalAlpha = pColFade;
+        ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
+        ctx.globalAlpha = 1;
         ctx.restore();
 
         if (i < numCols - 1) {
@@ -420,10 +450,12 @@ const Loader = ({ onDone, onFadeStart }) => {
           ctx.globalAlpha = pColFade * 0.5;
           ctx.setLineDash([5, 9.3]);
           ctx.lineWidth = 1.24;
+          // Tint the dashed line tip with the current theme's gradient end color
+          const tipColor = lerpHex(themeA.gradientEnd, themeB.gradientEnd, blend);
           const lineGrad = ctx.createLinearGradient(0, 0, 0, H);
           lineGrad.addColorStop(0, 'rgba(255,255,255,0)');
           lineGrad.addColorStop(0.35, 'rgba(255,255,255,0)');
-          lineGrad.addColorStop(1, '#FFFFFF');
+          lineGrad.addColorStop(1, tipColor);
           ctx.strokeStyle = lineGrad;
           const b = boundaries[i + 1];
           ctx.beginPath();
@@ -438,9 +470,14 @@ const Loader = ({ onDone, onFadeStart }) => {
       const pat = ctx.createPattern(noiseCanvas, 'repeat');
       if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
       ctx.restore();
-
+     } catch (err) {
+       // swallow per-frame errors so the rAF chain keeps running
+     } finally {
       raf = requestAnimationFrame(draw);
+     }
     };
+    // Immediate first frame so the canvas never appears blank while waiting on rAF.
+    try { draw(performance.now()); } catch (e) { /* defensive */ }
     raf = requestAnimationFrame(draw);
     return () => {
       cancelAnimationFrame(raf);
@@ -500,10 +537,8 @@ const Loader = ({ onDone, onFadeStart }) => {
           style={{ borderRadius: 16 }}
         />
         <div
+          ref={overlayRef}
           className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'linear-gradient(90deg, #0A2624 0%, #0A2624 22%, rgba(10,38,36,0.98) 32%, rgba(10,38,36,0.93) 42%, rgba(10,38,36,0.84) 52%, rgba(10,38,36,0.7) 62%, rgba(10,38,36,0.52) 72%, rgba(10,38,36,0.32) 82%, rgba(10,38,36,0.14) 92%, rgba(10,38,36,0) 100%)',
-          }}
         />
         <div
           className="relative text-white"
@@ -534,7 +569,7 @@ const Loader = ({ onDone, onFadeStart }) => {
         >
           <div
             className="h-full rounded-full transition-[width] duration-100 ease-linear"
-            style={{ width: `${progress}%`, backgroundColor: '#00FF48' }}
+            style={{ width: `${progress}%`, backgroundColor: '#FFFFFF' }}
           />
         </div>
       </div>
