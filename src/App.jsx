@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Square, DeviceMobile, Desktop, ArrowCircleDown, Sun, Moon, IconContext, Rectangle } from '@phosphor-icons/react';
+import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, CaretDown, FileSvg, FilmStrip, Package, XLogo, FacebookLogo, LinkedinLogo, X } from '@phosphor-icons/react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
@@ -108,9 +108,9 @@ const jitterPalette = (p) => ({
 });
 
 const FORMATS = {
-  post: { width: 1080, height: 1350, label: "Post", icon: Square },
-  story: { width: 1080, height: 1920, label: "Story", icon: (props) => <Rectangle {...props} className={`${props.className || ''} rotate-90 scale-x-110`} /> },
-  desktop: { width: 1920, height: 1080, label: "Desktop", icon: Desktop }
+  '9:16': { width: 1080, height: 1920, label: "9:16", name: "Full Portrait" },
+  '1:1': { width: 1080, height: 1080, label: "1:1", name: "Square" },
+  '16:9': { width: 1920, height: 1080, label: "16:9", name: "Landscape" },
 };
 
 // --- TAB ICONS (use currentColor so the active state can flip white → dark) ---
@@ -710,7 +710,7 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
 // --- MAIN APP COMPONENT ---
 export default function App() {
   // General state
-  const [format, setFormat] = useState('post');
+  const [format, setFormat] = useState('1:1');
   const [isAnimated, setIsAnimated] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [loaderDone, setLoaderDone] = useState(false);
@@ -768,6 +768,17 @@ export default function App() {
   const [gradientPos, setGradientPos] = useState('bottom');
   const [activeTab, setActiveTab] = useState('neonPattern'); // 'neonPattern' | 'spectrum' | 'radial'
   const [panelOpen, setPanelOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const exportMenuRef = useRef(null);
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const onDown = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) setExportMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [exportMenuOpen]);
   const [playHover] = useSound('/sounds/type_02.wav', { volume: 1, interrupt: true });
   const [playSwitch] = useSound('/sounds/rollover6.ogg', { volume: 0.4 });
 
@@ -1026,7 +1037,7 @@ export default function App() {
     const numCols = state.shapeCount || 9;
     const colWidth = width / numCols;
     const radius = Math.max(width, height) * 0.6;
-    const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
+    const yOffsetMultiplier = state.format === '16:9' ? 0.50 : 0.30;
     const baseBlobY = state.gradientPos === 'bottom' ? height + (radius * yOffsetMultiplier) : -(radius * yOffsetMultiplier);
 
     // Background and base variables
@@ -1149,7 +1160,7 @@ export default function App() {
     const startX = -extraLeft * colWidth;
 
     const radius = Math.max(width, height) * 0.4;
-    const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
+    const yOffsetMultiplier = state.format === '16:9' ? 0.50 : 0.30;
     const baseBlobY = state.gradientPos === 'bottom' ? height + (radius * yOffsetMultiplier) : -(radius * yOffsetMultiplier);
 
     const currentTime = state.animatedTime !== undefined ? state.animatedTime : time;
@@ -1319,7 +1330,7 @@ export default function App() {
     const ringStep = maxDiag / visibleRings;
 
     const radius = Math.max(width, height) * 0.4;
-    const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
+    const yOffsetMultiplier = state.format === '16:9' ? 0.50 : 0.30;
     const baseBlobY = state.gradientPos === 'bottom'
       ? height + (radius * yOffsetMultiplier)
       : -(radius * yOffsetMultiplier);
@@ -1587,7 +1598,7 @@ export default function App() {
     ctx.save();
     const radius = Math.max(width, height) * 0.6;
     // Moving up 10% more
-    const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
+    const yOffsetMultiplier = state.format === '16:9' ? 0.50 : 0.30;
     let baseBlobX = width / 2;
     let baseBlobY = state.gradientPos === 'bottom' ? height + (radius * yOffsetMultiplier) : -(radius * yOffsetMultiplier);
     let rx = radius;
@@ -1728,7 +1739,7 @@ export default function App() {
     const FADE_OUT_POINT = 0.60;
 
     const radius = Math.max(width, height) * 0.6;
-    const yOffsetMultiplier = state.format === 'desktop' ? 0.50 : 0.30;
+    const yOffsetMultiplier = state.format === '16:9' ? 0.50 : 0.30;
     const blobY = state.gradientPos === 'bottom' ? height + (radius * yOffsetMultiplier) : -(radius * yOffsetMultiplier);
     const rx = radius;
     const ry = radius;
@@ -1849,7 +1860,7 @@ export default function App() {
       const numColsW = spectrumCols + extraLeft + extraRight;
       const startXW = -extraLeft * colWidth;
       const radiusW = Math.max(width, height) * 0.4;
-      const yOffW = state.format === 'desktop' ? 0.50 : 0.30;
+      const yOffW = state.format === '16:9' ? 0.50 : 0.30;
       const baseBlobYW = state.gradientPos === 'bottom' ? height + (radiusW * yOffW) : -(radiusW * yOffW);
       const exportTime = 5000;
       const animTW = exportTime * 0.00012;
@@ -1920,7 +1931,7 @@ export default function App() {
       const visibleRings = state.shapeCount || 13;
       const ringStep = maxDiag / visibleRings;
       const radiusG = Math.max(width, height) * 0.4;
-      const yOffG = state.format === 'desktop' ? 0.50 : 0.30;
+      const yOffG = state.format === '16:9' ? 0.50 : 0.30;
       const baseBlobYG = state.gradientPos === 'bottom' ? height + (radiusG * yOffG) : -(radiusG * yOffG);
       const exportTime = 5000;
 
@@ -1990,6 +2001,7 @@ export default function App() {
     a.download = `neon-theme-creator-${state.format}.svg`;
     a.click();
     URL.revokeObjectURL(url);
+    setShareModalOpen(true);
   };
 
   // --- EXPORT MP4 VIDEO (High Quality Offline) ---
@@ -2069,6 +2081,7 @@ export default function App() {
       a.download = `neon-theme-creator-${stateRef.current.format}.mp4`;
       a.click();
       URL.revokeObjectURL(url);
+      setShareModalOpen(true);
 
     } catch (e) {
       console.error("Video export failed:", e);
@@ -2088,7 +2101,7 @@ export default function App() {
           from { opacity: 0; transform: translateX(-16px); }
           to { opacity: 1; transform: translateX(0); }
         }
-        .tab-fade-in-left { animation: fadeInLeft 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .tab-fade-in-left { animation: fadeInLeft 320ms cubic-bezier(0.22, 1, 0.36, 1); }
         @keyframes canvasFadeInUp {
           from { opacity: 0; transform: scale(0.96); }
           to { opacity: 1; transform: scale(1); }
@@ -2192,20 +2205,9 @@ export default function App() {
                 })}
               </div>
               <div className="h-5 w-px" style={{ backgroundColor: ui.border }} />
-              <div className="flex gap-2">
+              <div className="relative" ref={exportMenuRef}>
                 <button
-                  onClick={() => { playSwitch(); handleExportSVG(); }}
-                  disabled={isRecording}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full transition-colors duration-200 font-normal text-[12px] disabled:opacity-50"
-                  style={{ backgroundColor: ui.tabInactive, color: ui.textMuted }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
-                >
-                  <ArrowCircleDown className="w-3.5 h-3.5" />
-                  Export SVG
-                </button>
-                <button
-                  onClick={() => { playSwitch(); handleExportVideo(); }}
+                  onClick={() => { playSwitch(); setExportMenuOpen((v) => !v); }}
                   disabled={isRecording}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isRecording
                     ? 'bg-[#2a2a2a] text-[#999]'
@@ -2223,10 +2225,42 @@ export default function App() {
                   ) : (
                     <>
                       <ArrowCircleDown className="w-3.5 h-3.5" />
-                      Export Video (MP4)
+                      Export
+                      <CaretDown className={`w-3 h-3 transition-transform duration-200 ${exportMenuOpen ? 'rotate-180' : ''}`} />
                     </>
                   )}
                 </button>
+                {exportMenuOpen && !isRecording && (
+                  <div
+                    className="absolute right-0 mt-2 w-[260px] rounded-[16px] overflow-hidden z-30"
+                    style={{
+                      backgroundColor: ui.panelBg,
+                      border: `1px solid ${ui.border}`,
+                      color: ui.textPrimary,
+                    }}
+                  >
+                    {[
+                      { key: 'svg', Icon: FileSvg, label: 'SVG', desc: 'Vectorial Format', onClick: () => handleExportSVG() },
+                      { key: 'video', Icon: FilmStrip, label: 'VIDEO', desc: 'Animated video', onClick: () => handleExportVideo() },
+                      { key: 'zip', Icon: Package, label: 'ZIP', desc: 'Download All', onClick: () => { handleExportSVG(); handleExportVideo(); } },
+                    ].map(({ key, Icon, label, desc, onClick }) => (
+                      <button
+                        key={key}
+                        onClick={() => { playSwitch(); setExportMenuOpen(false); onClick(); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150"
+                        style={{ backgroundColor: 'transparent' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" style={{ color: ui.textPrimary }} />
+                        <div className="flex flex-col leading-tight">
+                          <span className="text-[12px] font-normal" style={{ color: ui.textPrimary }}>{label}</span>
+                          <span className="text-[11px] font-normal" style={{ color: ui.textSubtle }}>{desc}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </header>
@@ -2261,13 +2295,15 @@ export default function App() {
             {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
             <div
               ref={panelRef}
-              className={`panel-themed absolute left-[88px] top-1/2 w-[280px] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+              key={activeTab}
+              className={`panel-themed tab-fade-in-left absolute left-[88px] top-0 bottom-0 my-auto w-[280px] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
                 }`}
               style={{
                 backgroundColor: ui.panelBg,
                 color: ui.textPrimary,
                 maxHeight: 'calc(100% - 16px)',
-                transform: `translateY(-50%) translateX(${panelOpen ? '0px' : '16px'})`,
+                height: 'fit-content',
+                transform: `translateX(${panelOpen ? '0px' : '16px'})`,
                 '--sec-bg': ui.sectionBg,
                 '--text-primary': ui.textPrimary,
                 '--text-muted': ui.textMuted,
@@ -2280,7 +2316,7 @@ export default function App() {
                 '--slider-track': ui.sliderTrack,
               }}
             >
-              <div key={activeTab} className="tab-fade-in-left flex flex-col flex-1 min-h-0">
+              <div className="flex flex-col flex-1 min-h-0">
 
                 {/* PANEL TITLE — matches the active tab */}
                 <div className="px-4 pt-4 pb-2">
@@ -2296,19 +2332,29 @@ export default function App() {
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                     <label className="text-[11px] font-normal text-white mb-2 block">Presets</label>
                     <div className="flex justify-between">
-                      {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
+                      {Object.entries(FORMATS).map(([key, { label }]) => {
                         const isActive = format === key;
+                        const shapeStyle = key === '9:16'
+                          ? { width: 12, height: 20 }
+                          : key === '1:1'
+                            ? { width: 17, height: 17 }
+                            : { width: 22, height: 14 };
                         return (
                           <button
                             key={key}
                             onClick={() => { playSwitch(); setFormat(key); }}
-                            className={`flex flex-col items-center justify-center gap-1.5 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
+                            className={`flex flex-col items-center justify-center gap-2 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
                               ? 'bg-[var(--tab-active)] text-[var(--tab-active-text)]'
                               : 'bg-transparent text-[var(--text-subtle)] hover:bg-[var(--tab-hover)] hover:text-[var(--text-muted)]'
                               }`}
                           >
-                            <Icon className="w-5 h-5" />
-                            <span className="text-[11px] font-normal leading-none">{label}</span>
+                            <div className="flex items-center justify-center" style={{ height: 22 }}>
+                              <div
+                                className="rounded-[3px] shrink-0"
+                                style={{ ...shapeStyle, backgroundColor: 'currentColor' }}
+                              />
+                            </div>
+                            <span className="w-full text-center text-[10px] font-normal leading-none opacity-70 tabular-nums">{label}</span>
                           </button>
                         );
                       })}
@@ -2547,6 +2593,84 @@ export default function App() {
 
           </div>
         </div>
+
+        {shareModalOpen && (
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center px-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            onClick={() => setShareModalOpen(false)}
+          >
+            <div
+              className="w-full max-w-[440px] rounded-[20px] p-8 relative"
+              style={{ backgroundColor: ui.panelBg, color: ui.textPrimary, border: `1px solid ${ui.border}` }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShareModalOpen(false)}
+                aria-label="Close"
+                className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200"
+                style={{ color: ui.textSubtle }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="text-center mb-2">
+                <img src="/logo.png" alt="Glowy" className="h-10 w-10 object-contain mx-auto" />
+              </div>
+              <h2 className="text-center text-[20px] font-normal tracking-tight mb-3" style={{ color: ui.textPrimary }}>
+                Your file is ready!
+              </h2>
+              <p className="text-center text-[13px] font-normal leading-relaxed mb-6" style={{ color: ui.textSubtle }}>
+                Glowy is free and built with love. If you enjoyed it, share it with your friends and fellow creators!
+              </p>
+
+              <div className="flex flex-col gap-2 mb-5">
+                {[
+                  { key: 'x', Icon: XLogo, label: 'Share on X', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent('Just made something with Glowy ✨')}&url=${encodeURIComponent(window.location.href)}` },
+                  { key: 'fb', Icon: FacebookLogo, label: 'Share on Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}` },
+                  { key: 'li', Icon: LinkedinLogo, label: 'Share on LinkedIn', url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}` },
+                ].map(({ key, Icon, label, url }) => (
+                  <a
+                    key={key}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-4 py-3 rounded-[12px] transition-colors duration-150"
+                    style={{ border: `1px solid ${ui.border}`, color: ui.textPrimary }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="text-[13px] font-normal">{label}</span>
+                  </a>
+                ))}
+              </div>
+
+              <div className="rounded-[12px] p-4 mb-5" style={{ backgroundColor: ui.sectionBg }}>
+                <p className="text-[12px] font-normal leading-relaxed" style={{ color: ui.textSubtle }}>
+                  Every share helps Glowy grow and stay free. Thank you for being part of the community!
+                </p>
+              </div>
+
+              <div className="pt-4 text-center" style={{ borderTop: `1px solid ${ui.border}` }}>
+                <p className="text-[12px] font-normal" style={{ color: ui.textSubtle }}>
+                  Made with Love by{' '}
+                  <a
+                    href="https://x.com/javiercrocco"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                    style={{ color: ui.textPrimary }}
+                  >
+                    Javier Crocco Mendez
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </IconContext.Provider>
     </>
   );
