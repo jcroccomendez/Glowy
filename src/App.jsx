@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Square, DeviceMobile, Desktop, ArrowCircleDown, Sun, Moon, IconContext } from '@phosphor-icons/react';
+import { Square, DeviceMobile, Desktop, ArrowCircleDown, Sun, Moon, IconContext, Rectangle } from '@phosphor-icons/react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
@@ -109,7 +109,7 @@ const jitterPalette = (p) => ({
 
 const FORMATS = {
   post: { width: 1080, height: 1350, label: "Post", icon: Square },
-  story: { width: 1080, height: 1920, label: "Story", icon: DeviceMobile },
+  story: { width: 1080, height: 1920, label: "Story", icon: (props) => <Rectangle {...props} className={`${props.className || ''} rotate-90 scale-x-110`} /> },
   desktop: { width: 1920, height: 1080, label: "Desktop", icon: Desktop }
 };
 
@@ -2129,7 +2129,7 @@ export default function App() {
         }
       `}} />
 
-      <IconContext.Provider value={{ weight: 'duotone' }}>
+      <IconContext.Provider value={{ weight: 'fill' }}>
         {!loaderDone && (
           <Loader onDone={() => setLoaderDone(true)} bgColor={ui.appBg} />
         )}
