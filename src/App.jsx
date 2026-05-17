@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, CaretDown, FileSvg, FilmStrip, Package, XLogo, FacebookLogo, LinkedinLogo, X } from '@phosphor-icons/react';
+import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X } from '@phosphor-icons/react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
@@ -770,6 +770,15 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareModalRender, setShareModalRender] = useState(false);
+  useEffect(() => {
+    if (shareModalOpen) {
+      setShareModalRender(true);
+    } else if (shareModalRender) {
+      const t = setTimeout(() => setShareModalRender(false), 220);
+      return () => clearTimeout(t);
+    }
+  }, [shareModalOpen, shareModalRender]);
   const exportMenuRef = useRef(null);
   useEffect(() => {
     if (!exportMenuOpen) return;
@@ -2205,9 +2214,20 @@ export default function App() {
                 })}
               </div>
               <div className="h-5 w-px" style={{ backgroundColor: ui.border }} />
-              <div className="relative" ref={exportMenuRef}>
+              <div className="flex gap-2">
                 <button
-                  onClick={() => { playSwitch(); setExportMenuOpen((v) => !v); }}
+                  onClick={() => { playSwitch(); handleExportSVG(); }}
+                  disabled={isRecording}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full transition-colors duration-200 font-normal text-[12px] disabled:opacity-50"
+                  style={{ backgroundColor: ui.tabInactive, color: ui.textMuted }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
+                >
+                  <ArrowCircleDown className="w-3.5 h-3.5" />
+                  Download SVG
+                </button>
+                <button
+                  onClick={() => { playSwitch(); handleExportVideo(); }}
                   disabled={isRecording}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isRecording
                     ? 'bg-[#2a2a2a] text-[#999]'
@@ -2225,42 +2245,10 @@ export default function App() {
                   ) : (
                     <>
                       <ArrowCircleDown className="w-3.5 h-3.5" />
-                      Export
-                      <CaretDown className={`w-3 h-3 transition-transform duration-200 ${exportMenuOpen ? 'rotate-180' : ''}`} />
+                      Download Video
                     </>
                   )}
                 </button>
-                {exportMenuOpen && !isRecording && (
-                  <div
-                    className="absolute right-0 mt-2 w-[260px] rounded-[16px] overflow-hidden z-30"
-                    style={{
-                      backgroundColor: ui.panelBg,
-                      border: `1px solid ${ui.border}`,
-                      color: ui.textPrimary,
-                    }}
-                  >
-                    {[
-                      { key: 'svg', Icon: FileSvg, label: 'SVG', desc: 'Vectorial Format', onClick: () => handleExportSVG() },
-                      { key: 'video', Icon: FilmStrip, label: 'VIDEO', desc: 'Animated video', onClick: () => handleExportVideo() },
-                      { key: 'zip', Icon: Package, label: 'ZIP', desc: 'Download All', onClick: () => { handleExportSVG(); handleExportVideo(); } },
-                    ].map(({ key, Icon, label, desc, onClick }) => (
-                      <button
-                        key={key}
-                        onClick={() => { playSwitch(); setExportMenuOpen(false); onClick(); }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150"
-                        style={{ backgroundColor: 'transparent' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                      >
-                        <Icon className="w-4 h-4 shrink-0" style={{ color: ui.textPrimary }} />
-                        <div className="flex flex-col leading-tight">
-                          <span className="text-[12px] font-normal" style={{ color: ui.textPrimary }}>{label}</span>
-                          <span className="text-[11px] font-normal" style={{ color: ui.textSubtle }}>{desc}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </header>
@@ -2594,15 +2582,25 @@ export default function App() {
           </div>
         </div>
 
-        {shareModalOpen && (
+        {shareModalRender && (
           <div
-            className="fixed inset-0 z-[200] flex items-center justify-center px-4"
-            style={{ backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            className="fixed inset-0 z-[200] flex items-center justify-center px-4 transition-opacity duration-200 ease-out"
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              opacity: shareModalOpen ? 1 : 0,
+            }}
             onClick={() => setShareModalOpen(false)}
           >
             <div
-              className="w-full max-w-[440px] rounded-[20px] p-8 relative"
-              style={{ backgroundColor: ui.panelBg, color: ui.textPrimary, border: `1px solid ${ui.border}` }}
+              className="w-full max-w-[440px] rounded-[20px] p-8 relative transition-[opacity,transform] duration-200 ease-out"
+              style={{
+                backgroundColor: isLight ? '#FFFFFF' : ui.panelBg,
+                color: ui.textPrimary,
+                opacity: shareModalOpen ? 1 : 0,
+                transform: shareModalOpen ? 'scale(1)' : 'scale(0.96)',
+              }}
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -2613,7 +2611,7 @@ export default function App() {
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" weight="regular" />
               </button>
 
               <div className="text-center mb-2">
@@ -2637,10 +2635,10 @@ export default function App() {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-3 rounded-[12px] transition-colors duration-150"
-                    style={{ border: `1px solid ${ui.border}`, color: ui.textPrimary }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-full transition-colors duration-150"
+                    style={{ backgroundColor: ui.tabInactive, color: isLight ? ui.textMuted : ui.textPrimary }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
                     <span className="text-[13px] font-normal">{label}</span>
