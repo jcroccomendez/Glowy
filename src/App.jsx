@@ -600,7 +600,7 @@ const Tooltip = ({ label, side = 'right', children }) => {
       <span
         role="tooltip"
         className={`pointer-events-none absolute ${sideClasses[side]} h-[30px] px-4 inline-flex items-center text-[12px] font-regular rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-150 z-50`}
-        style={{ backgroundColor: '#1e1e1e', color: '#FFFFFF' }}
+        style={{ backgroundColor: 'var(--tab-hover)', color: 'var(--text-primary)' }}
       >
         {label}
       </span>
@@ -636,7 +636,7 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
         }}
         className="w-full h-[2px] rounded-full appearance-none cursor-pointer focus:outline-none"
         style={{
-          background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${percentage}%, #333 ${percentage}%, #333 100%)`
+          background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${percentage}%, var(--slider-track) ${percentage}%, var(--slider-track) 100%)`
         }}
       />
     </div>
@@ -656,7 +656,7 @@ const Switch = ({ label, checked, onChange, icon }) => {
       </div>
       <button
         onClick={toggle}
-        className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[var(--accent)]' : 'bg-[#333]'
+        className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[var(--accent)]' : 'bg-[var(--slider-track)] opacity-60'
           }`}
       >
         <span
@@ -677,7 +677,7 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
     const base = `absolute transition-colors duration-200 ${isDisabled ? 'opacity-10 cursor-not-allowed' : 'cursor-pointer'}`;
 
     const activeColor = "bg-[var(--accent)]";
-    const inactiveColor = "bg-[#333] hover:bg-[#444]";
+    const inactiveColor = "bg-[var(--accent)] opacity-25 hover:opacity-40";
 
     let shape = "";
     if (dir === 'top') shape = "w-1.5 h-4 top-1.5 left-1/2 -translate-x-1/2 rounded-full";
@@ -738,7 +738,7 @@ export default function App() {
     panelBg: isLight ? '#ececec' : '#181818',
     sectionBg: isLight ? '#f7f7f7' : '#1e1e1e',
     tabInactive: isLight ? '#ececec' : '#1e1e1e',
-    tabHover: isLight ? '#ececec' : '#252525',
+    tabHover: isLight ? '#e0e0e0' : '#252525',
     tabActive: isLight ? '#ececec' : '#2a2a2a',
     tabActiveText: isLight ? '#0A0A0B' : '#FFFFFF',
     textPrimary: isLight ? '#0A0A0B' : '#FFFFFF',
@@ -747,6 +747,7 @@ export default function App() {
     border: isLight ? '#D4D4D8' : '#3A3A3A',
     accent: isLight ? '#000000' : '#FFFFFF',
     accentInverse: isLight ? '#FFFFFF' : '#000000',
+    sliderTrack: isLight ? '#D9D9D9' : '#2A2A2A',
   };
 
   // Preload all UI sounds on first paint
@@ -943,10 +944,10 @@ export default function App() {
     stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise };
   }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise]);
 
-  // Reset intro animation when changing tabs or main UI becomes visible
+  // Reset intro animation when changing tabs, theme, or main UI becomes visible
   useEffect(() => {
     introStartTimeRef.current = -1;
-  }, [activeTab, loaderDone]);
+  }, [activeTab, loaderDone, colorTheme, customTheme]);
 
   // Fade-in-up on the entire canvas wrapper whenever tab, format, theme,
   // or random theme changes (animation moves the whole rounded card).
@@ -1485,8 +1486,8 @@ export default function App() {
     // --- CLASSIC MODE (Dots and Oval Gradient) ---
 
     // Slowed sweep parameters
-    const WAVE_SPEED = 2000;
-    const DOT_ANIM_DURATION = 1400;
+    const WAVE_SPEED = 900;
+    const DOT_ANIM_DURATION = 600;
     const FADE_OUT_POINT = 0.60; // Los puntos se desvanecen al 60% del canvas
 
     const cols = Math.floor((width - state.dotSpacing) / state.dotSpacing);
@@ -1696,7 +1697,7 @@ export default function App() {
       // Skip redraw when the scene is fully static:
       // intro animation done, animation off, no mouse interaction
       const introAge = introStartTimeRef.current >= 0 ? time - introStartTimeRef.current : 0;
-      const introSettled = introAge > 3500;
+      const introSettled = introAge > 1200;
       const noInteraction = interactRef.current.weight < 0.001 && !mousePosRef.current;
       if (!state.isAnimated && introSettled && noInteraction) return;
 
@@ -2150,6 +2151,7 @@ export default function App() {
             '--tab-active-text': ui.tabActiveText,
             '--accent': ui.accent,
             '--accent-inverse': ui.accentInverse,
+            '--slider-track': ui.sliderTrack,
           }}
         >
 
@@ -2178,9 +2180,11 @@ export default function App() {
                       onClick={() => { playSwitch(); setThemePref(key); }}
                       className="flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200"
                       style={{
-                        backgroundColor: active ? ui.tabActive : 'transparent',
+                        backgroundColor: active ? ui.tabHover : 'transparent',
                         color: active ? ui.tabActiveText : ui.textSubtle,
                       }}
+                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                      onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent'; }}
                     >
                       <Icon className="w-4 h-4" />
                     </button>
@@ -2189,39 +2193,41 @@ export default function App() {
               </div>
               <div className="h-5 w-px" style={{ backgroundColor: ui.border }} />
               <div className="flex gap-2">
-              <button
-                onClick={() => { playSwitch(); handleExportSVG(); }}
-                disabled={isRecording}
-                className="flex items-center gap-2 px-4 py-2 rounded-full transition-colors duration-200 font-normal text-[12px] disabled:opacity-50"
-                style={{ backgroundColor: ui.tabInactive, color: ui.textMuted }}
-              >
-                <ArrowCircleDown className="w-3.5 h-3.5" />
-                Export SVG
-              </button>
-              <button
-                onClick={() => { playSwitch(); handleExportVideo(); }}
-                disabled={isRecording}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isRecording
-                  ? 'bg-[#2a2a2a] text-[#999]'
-                  : isLight
-                    ? 'bg-[#161616] hover:bg-[#161616]/90'
-                    : 'bg-white hover:bg-white/90'
-                  }`}
-                style={!isRecording ? { color: isLight ? '#FFFFFF' : '#000000' } : undefined}
-              >
-                {isRecording ? (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#999] animate-pulse" />
-                    Downloading...
-                  </>
-                ) : (
-                  <>
-                    <ArrowCircleDown className="w-3.5 h-3.5" />
-                    Export Video (MP4)
-                  </>
-                )}
-              </button>
-            </div>
+                <button
+                  onClick={() => { playSwitch(); handleExportSVG(); }}
+                  disabled={isRecording}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full transition-colors duration-200 font-normal text-[12px] disabled:opacity-50"
+                  style={{ backgroundColor: ui.tabInactive, color: ui.textMuted }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
+                >
+                  <ArrowCircleDown className="w-3.5 h-3.5" />
+                  Export SVG
+                </button>
+                <button
+                  onClick={() => { playSwitch(); handleExportVideo(); }}
+                  disabled={isRecording}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isRecording
+                    ? 'bg-[#2a2a2a] text-[#999]'
+                    : isLight
+                      ? 'bg-[#161616] hover:bg-[#161616]/90'
+                      : 'bg-white hover:bg-white/90'
+                    }`}
+                  style={!isRecording ? { color: isLight ? '#FFFFFF' : '#000000' } : undefined}
+                >
+                  {isRecording ? (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#999] animate-pulse" />
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowCircleDown className="w-3.5 h-3.5" />
+                      Export Video (MP4)
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </header>
 
@@ -2269,15 +2275,16 @@ export default function App() {
                 '--tab-hover': ui.tabHover,
                 '--tab-active': ui.tabActive,
                 '--tab-active-text': ui.tabActiveText,
-            '--accent': ui.accent,
-            '--accent-inverse': ui.accentInverse,
+                '--accent': ui.accent,
+                '--accent-inverse': ui.accentInverse,
+                '--slider-track': ui.sliderTrack,
               }}
             >
               <div key={activeTab} className="tab-fade-in-left flex flex-col flex-1 min-h-0">
 
                 {/* PANEL TITLE — matches the active tab */}
                 <div className="px-4 pt-4 pb-2">
-                  <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#00F345' }}>
+                  <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
                     {TABS.find((t) => t.id === activeTab)?.label}
                   </h2>
                 </div>
