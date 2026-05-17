@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Square, DeviceMobile, Desktop, ArrowCircleDown, IconContext } from '@phosphor-icons/react';
+import { Square, DeviceMobile, Desktop, ArrowCircleDown, Sun, Moon, IconContext } from '@phosphor-icons/react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
@@ -193,7 +193,7 @@ const NeonplaceLogo = ({ className }) => (
       <path fillRule="evenodd" clipRule="evenodd" d="M19.089 0v9.113l-6.356 6.357-6.367-6.367L0 15.47V6.357L6.356 0l6.367 6.368L19.089 0Z" fill="#24F187" />
       <path fillRule="evenodd" clipRule="evenodd" d="M6.367 15.47H4.71V14.3l1.657-1.657 1.656 1.657v1.17H6.367Z" fill="#fff" />
     </svg>
-    <span className="text-white text-[14px] font-semibold tracking-tight leading-none">neonplace</span>
+    <span className="text-white text-[14px] font-normal tracking-tight leading-none">neonplace</span>
   </div>
 );
 
@@ -326,155 +326,155 @@ const Loader = ({ onDone, onFadeStart }) => {
     const SLOT_MS = 1200;
     const FADE_MS = 300;
     const draw = (time) => {
-     try {
-      const elapsed = time - startTime;
-      const mPos = mousePosRef.current;
-      if (mPos) {
-        interactRef.current.weight += (0.2 - interactRef.current.weight) * 0.2;
-        interactRef.current.x += (mPos.x - interactRef.current.x) * 0.2;
-        interactRef.current.y += (mPos.y - interactRef.current.y) * 0.2;
-      } else {
-        interactRef.current.weight += (0 - interactRef.current.weight) * 0.2;
-      }
-
-      // Theme cycling: hold each theme purely for SLOT_MS then crossfade
-      // for FADE_MS into the next. Each segment = SLOT_MS + FADE_MS.
-      const SEG_MS = SLOT_MS + FADE_MS;
-      const slot = Math.floor(elapsed / SEG_MS);
-      const segElapsed = elapsed - slot * SEG_MS;
-      const idxA = slot % themesCycle.length;
-      const idxB = (slot + 1) % themesCycle.length;
-      const inFade = segElapsed > SLOT_MS;
-      const blend = inFade ? (segElapsed - SLOT_MS) / FADE_MS : 0;
-      const themeA = themesCycle[idxA];
-      const themeB = themesCycle[idxB];
-      const bgNow = lerpHex(themeA.bg, themeB.bg, blend);
-
-      const offS = off.width / W;
-      ctx.fillStyle = bgNow;
-      ctx.fillRect(0, 0, W, H);
-
-      // Sync left overlay gradient to the current theme bg color
-      if (overlayRef.current) {
-        const [r, g, b] = hexToRgb(bgNow);
-        const rgb = `${r}, ${g}, ${b}`;
-        overlayRef.current.style.background = `linear-gradient(90deg, rgb(${rgb}) 0%, rgb(${rgb}) 22%, rgba(${rgb},0.98) 32%, rgba(${rgb},0.93) 42%, rgba(${rgb},0.84) 52%, rgba(${rgb},0.7) 62%, rgba(${rgb},0.52) 72%, rgba(${rgb},0.32) 82%, rgba(${rgb},0.14) 92%, rgba(${rgb},0) 100%)`;
-      }
-
-      const spectrumCols = 9;
-      const colWidth = W / spectrumCols;
-      const extraLeft = 4, extraRight = 4;
-      const numCols = spectrumCols + extraLeft + extraRight;
-      const startX = -extraLeft * colWidth;
-
-      const radius = Math.max(W, H) * 0.4;
-      const baseBlobY = H + radius * 0.30;
-      const animT = time * 0.00012;
-      const numPoints = 60;
-
-      const getWarpedX = (baseX, y) => {
-        const yRatio = y / H;
-        const focalX = W * 0.05;
-        const spread = Math.pow(yRatio, 0.7);
-        const targetX = baseX * 1.2;
-        const fanX = focalX + (targetX - focalX) * spread;
-        const arc = Math.sin(yRatio * Math.PI) * W * 0.035;
-        const breath = Math.sin(animT) * W * 0.008 * yRatio;
-        return fanX + arc + breath;
-      };
-
-      const boundaries = [];
-      for (let col = 0; col <= numCols; col++) {
-        const baseX = startX + col * colWidth;
-        const points = [];
-        for (let j = 0; j <= numPoints; j++) {
-          const y = (j / numPoints) * H;
-          points.push({ x: getWarpedX(baseX, y), y });
+      try {
+        const elapsed = time - startTime;
+        const mPos = mousePosRef.current;
+        if (mPos) {
+          interactRef.current.weight += (0.2 - interactRef.current.weight) * 0.2;
+          interactRef.current.x += (mPos.x - interactRef.current.x) * 0.2;
+          interactRef.current.y += (mPos.y - interactRef.current.y) * 0.2;
+        } else {
+          interactRef.current.weight += (0 - interactRef.current.weight) * 0.2;
         }
-        boundaries.push(points);
-      }
 
-      for (let i = 0; i < numCols; i++) {
-        const colDelayMs = i * 60;
-        const colDurationMs = 800;
-        const rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
-        const pColFade = Math.pow(rawColP, 2);
+        // Theme cycling: hold each theme purely for SLOT_MS then crossfade
+        // for FADE_MS into the next. Each segment = SLOT_MS + FADE_MS.
+        const SEG_MS = SLOT_MS + FADE_MS;
+        const slot = Math.floor(elapsed / SEG_MS);
+        const segElapsed = elapsed - slot * SEG_MS;
+        const idxA = slot % themesCycle.length;
+        const idxB = (slot + 1) % themesCycle.length;
+        const inFade = segElapsed > SLOT_MS;
+        const blend = inFade ? (segElapsed - SLOT_MS) / FADE_MS : 0;
+        const themeA = themesCycle[idxA];
+        const themeB = themesCycle[idxB];
+        const bgNow = lerpHex(themeA.bg, themeB.bg, blend);
 
-        ctx.save();
-        const leftBound = boundaries[i];
-        const rightBound = boundaries[i + 1];
-        ctx.beginPath();
-        ctx.moveTo(leftBound[0].x, leftBound[0].y);
-        for (let j = 1; j < leftBound.length; j++) ctx.lineTo(leftBound[j].x, leftBound[j].y);
-        for (let j = rightBound.length - 1; j >= 0; j--) ctx.lineTo(rightBound[j].x, rightBound[j].y);
-        ctx.closePath();
-        ctx.clip();
+        const offS = off.width / W;
+        ctx.fillStyle = bgNow;
+        ctx.fillRect(0, 0, W, H);
 
-        const t = (time + i * 400) * 0.0015;
-        const waveX = W / 2 + Math.sin(t * 0.5) * (W * 0.25);
-        const waveY = baseBlobY + Math.cos(t * 0.8) * (H * 0.15);
-        const iw = interactRef.current.weight;
-        const blobX = waveX * (1 - iw) + interactRef.current.x * iw;
-        const blobY = waveY * (1 - iw) + interactRef.current.y * iw;
-        let rx = radius + Math.sin(t * 1.2) * (W * 0.15);
-        let ry = radius + Math.cos(t * 1.5) * (H * 0.10);
-        const gradScale = 0.9 + (0.1 * pColFade);
-        rx *= gradScale;
-        ry *= gradScale;
+        // Sync left overlay gradient to the current theme bg color
+        if (overlayRef.current) {
+          const [r, g, b] = hexToRgb(bgNow);
+          const rgb = `${r}, ${g}, ${b}`;
+          overlayRef.current.style.background = `linear-gradient(90deg, rgb(${rgb}) 0%, rgb(${rgb}) 22%, rgba(${rgb},0.98) 32%, rgba(${rgb},0.93) 42%, rgba(${rgb},0.84) 52%, rgba(${rgb},0.7) 62%, rgba(${rgb},0.52) 72%, rgba(${rgb},0.32) 82%, rgba(${rgb},0.14) 92%, rgba(${rgb},0) 100%)`;
+        }
 
-        // Render blurred gradient ellipse via offscreen ctx.filter blur. Lerped
-        // gradient colors so the cycle transitions remain visible. Reliable
-        // across browsers — no SVG sprite loading dependency.
-        const fbStart = lerpHex(themeA.gradientStart, themeB.gradientStart, blend);
-        const fbEnd = lerpHex(themeA.gradientEnd, themeB.gradientEnd, blend);
-        offCtx.clearRect(0, 0, off.width, off.height);
-        offCtx.filter = `blur(${170 * offS}px)`;
-        const grad = offCtx.createLinearGradient(
-          (blobX - rx) * offS, blobY * offS,
-          (blobX + rx) * offS, blobY * offS,
-        );
-        grad.addColorStop(0.1529, fbStart);
-        grad.addColorStop(0.8046, fbEnd);
-        offCtx.fillStyle = grad;
-        offCtx.beginPath();
-        offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
-        offCtx.fill();
-        offCtx.filter = 'none';
-        ctx.globalAlpha = pColFade;
-        ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
-        ctx.globalAlpha = 1;
-        ctx.restore();
+        const spectrumCols = 9;
+        const colWidth = W / spectrumCols;
+        const extraLeft = 4, extraRight = 4;
+        const numCols = spectrumCols + extraLeft + extraRight;
+        const startX = -extraLeft * colWidth;
 
-        if (i < numCols - 1) {
+        const radius = Math.max(W, H) * 0.4;
+        const baseBlobY = H + radius * 0.30;
+        const animT = time * 0.00012;
+        const numPoints = 60;
+
+        const getWarpedX = (baseX, y) => {
+          const yRatio = y / H;
+          const focalX = W * 0.05;
+          const spread = Math.pow(yRatio, 0.7);
+          const targetX = baseX * 1.2;
+          const fanX = focalX + (targetX - focalX) * spread;
+          const arc = Math.sin(yRatio * Math.PI) * W * 0.035;
+          const breath = Math.sin(animT) * W * 0.008 * yRatio;
+          return fanX + arc + breath;
+        };
+
+        const boundaries = [];
+        for (let col = 0; col <= numCols; col++) {
+          const baseX = startX + col * colWidth;
+          const points = [];
+          for (let j = 0; j <= numPoints; j++) {
+            const y = (j / numPoints) * H;
+            points.push({ x: getWarpedX(baseX, y), y });
+          }
+          boundaries.push(points);
+        }
+
+        for (let i = 0; i < numCols; i++) {
+          const colDelayMs = i * 60;
+          const colDurationMs = 800;
+          const rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
+          const pColFade = Math.pow(rawColP, 2);
+
           ctx.save();
-          ctx.globalAlpha = pColFade * 0.5;
-          ctx.setLineDash([5, 9.3]);
-          ctx.lineWidth = 1.24;
-          // Tint the dashed line tip with the current theme's gradient end color
-          const tipColor = lerpHex(themeA.gradientEnd, themeB.gradientEnd, blend);
-          const lineGrad = ctx.createLinearGradient(0, 0, 0, H);
-          lineGrad.addColorStop(0, 'rgba(255,255,255,0)');
-          lineGrad.addColorStop(0.35, 'rgba(255,255,255,0)');
-          lineGrad.addColorStop(1, tipColor);
-          ctx.strokeStyle = lineGrad;
-          const b = boundaries[i + 1];
+          const leftBound = boundaries[i];
+          const rightBound = boundaries[i + 1];
           ctx.beginPath();
-          ctx.moveTo(b[0].x, b[0].y);
-          for (let j = 1; j < b.length; j++) ctx.lineTo(b[j].x, b[j].y);
-          ctx.stroke();
+          ctx.moveTo(leftBound[0].x, leftBound[0].y);
+          for (let j = 1; j < leftBound.length; j++) ctx.lineTo(leftBound[j].x, leftBound[j].y);
+          for (let j = rightBound.length - 1; j >= 0; j--) ctx.lineTo(rightBound[j].x, rightBound[j].y);
+          ctx.closePath();
+          ctx.clip();
+
+          const t = (time + i * 400) * 0.0015;
+          const waveX = W / 2 + Math.sin(t * 0.5) * (W * 0.25);
+          const waveY = baseBlobY + Math.cos(t * 0.8) * (H * 0.15);
+          const iw = interactRef.current.weight;
+          const blobX = waveX * (1 - iw) + interactRef.current.x * iw;
+          const blobY = waveY * (1 - iw) + interactRef.current.y * iw;
+          let rx = radius + Math.sin(t * 1.2) * (W * 0.15);
+          let ry = radius + Math.cos(t * 1.5) * (H * 0.10);
+          const gradScale = 0.9 + (0.1 * pColFade);
+          rx *= gradScale;
+          ry *= gradScale;
+
+          // Render blurred gradient ellipse via offscreen ctx.filter blur. Lerped
+          // gradient colors so the cycle transitions remain visible. Reliable
+          // across browsers — no SVG sprite loading dependency.
+          const fbStart = lerpHex(themeA.gradientStart, themeB.gradientStart, blend);
+          const fbEnd = lerpHex(themeA.gradientEnd, themeB.gradientEnd, blend);
+          offCtx.clearRect(0, 0, off.width, off.height);
+          offCtx.filter = `blur(${170 * offS}px)`;
+          const grad = offCtx.createLinearGradient(
+            (blobX - rx) * offS, blobY * offS,
+            (blobX + rx) * offS, blobY * offS,
+          );
+          grad.addColorStop(0.1529, fbStart);
+          grad.addColorStop(0.8046, fbEnd);
+          offCtx.fillStyle = grad;
+          offCtx.beginPath();
+          offCtx.ellipse(blobX * offS, blobY * offS, rx * offS, ry * offS, 0, 0, Math.PI * 2);
+          offCtx.fill();
+          offCtx.filter = 'none';
+          ctx.globalAlpha = pColFade;
+          ctx.drawImage(off, 0, 0, off.width, off.height, 0, 0, W, H);
+          ctx.globalAlpha = 1;
           ctx.restore();
+
+          if (i < numCols - 1) {
+            ctx.save();
+            ctx.globalAlpha = pColFade * 0.5;
+            ctx.setLineDash([5, 9.3]);
+            ctx.lineWidth = 1.24;
+            // Tint the dashed line tip with the current theme's gradient end color
+            const tipColor = lerpHex(themeA.gradientEnd, themeB.gradientEnd, blend);
+            const lineGrad = ctx.createLinearGradient(0, 0, 0, H);
+            lineGrad.addColorStop(0, 'rgba(255,255,255,0)');
+            lineGrad.addColorStop(0.35, 'rgba(255,255,255,0)');
+            lineGrad.addColorStop(1, tipColor);
+            ctx.strokeStyle = lineGrad;
+            const b = boundaries[i + 1];
+            ctx.beginPath();
+            ctx.moveTo(b[0].x, b[0].y);
+            for (let j = 1; j < b.length; j++) ctx.lineTo(b[j].x, b[j].y);
+            ctx.stroke();
+            ctx.restore();
+          }
         }
+        ctx.save();
+        ctx.globalAlpha = 0.025;
+        const pat = ctx.createPattern(noiseCanvas, 'repeat');
+        if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
+        ctx.restore();
+      } catch (err) {
+        // swallow per-frame errors so the rAF chain keeps running
+      } finally {
+        raf = requestAnimationFrame(draw);
       }
-      ctx.save();
-      ctx.globalAlpha = 0.025;
-      const pat = ctx.createPattern(noiseCanvas, 'repeat');
-      if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
-      ctx.restore();
-     } catch (err) {
-       // swallow per-frame errors so the rAF chain keeps running
-     } finally {
-      raf = requestAnimationFrame(draw);
-     }
     };
     // Immediate first frame so the canvas never appears blank while waiting on rAF.
     try { draw(performance.now()); } catch (e) { /* defensive */ }
@@ -607,7 +607,7 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
   return (
     <div className="flex flex-col gap-1 mb-1 last:mb-0">
       <div className="flex justify-between items-center" style={{ marginBottom: 6 }}>
-        <label className="text-[11px] font-medium text-white">{label}</label>
+        <label className="text-[11px] font-normal text-white">{label}</label>
         <span className="text-[11px] text-[#666] font-mono tabular-nums">{formatValue(value)}</span>
       </div>
       <input
@@ -640,7 +640,7 @@ const Switch = ({ label, checked, onChange, icon }) => {
     <div className="flex items-center justify-between py-1.5">
       <div className="flex items-center gap-2">
         {icon && <span className="text-[#666]">{icon}</span>}
-        <label className="text-[12px] font-medium text-white cursor-pointer" onClick={toggle}>
+        <label className="text-[12px] font-normal text-white cursor-pointer" onClick={toggle}>
           {label}
         </label>
       </div>
@@ -680,7 +680,7 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
 
   return (
     <div className="flex items-center justify-between">
-      <label className="text-[11px] font-medium text-white">{label}</label>
+      <label className="text-[11px] font-normal text-white">{label}</label>
       <div className="relative w-24 h-14 bg-[#222] rounded-xl flex items-center justify-center">
         <div className="relative w-4 h-4 pointer-events-none opacity-30">
           <div className="absolute top-1/2 left-0 w-full h-px bg-[#666] -translate-y-1/2"></div>
@@ -708,6 +708,34 @@ export default function App() {
   const [customTheme, setCustomTheme] = useState(null);
   const [showDashed, setShowDashed] = useState(true);
   const [showNoise, setShowNoise] = useState(true);
+  const [themePref, setThemePref] = useState('dark'); // 'system' | 'light' | 'dark'
+  const [systemDark, setSystemDark] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : true
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => setSystemDark(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  const uiTheme = themePref === 'system' ? (systemDark ? 'dark' : 'light') : themePref;
+  const isLight = uiTheme === 'light';
+  const ui = {
+    appBg: isLight ? '#F4F4F5' : '#0d0d0d',
+    panelBg: isLight ? '#ECECEE' : '#181818',
+    sectionBg: isLight ? '#DCDCE0' : '#1e1e1e',
+    tabInactive: isLight ? '#DCDCE0' : '#1e1e1e',
+    tabHover: isLight ? '#D4D4D8' : '#252525',
+    tabActive: isLight ? '#D4D4D8' : '#2a2a2a',
+    tabActiveText: isLight ? '#0A0A0B' : '#FFFFFF',
+    textPrimary: isLight ? '#0A0A0B' : '#FFFFFF',
+    textMuted: isLight ? '#5F5F66' : '#999999',
+    textSubtle: isLight ? '#8A8A93' : '#666666',
+    border: isLight ? '#D4D4D8' : '#3A3A3A',
+  };
 
   // Preload all UI sounds on first paint
   useEffect(() => {
@@ -2049,6 +2077,10 @@ export default function App() {
         .panel-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
         .panel-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
         .panel-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
+        .app-themed .text-white { color: var(--text-primary) !important; }
+        .app-themed .text-\\[\\#666\\] { color: var(--text-subtle) !important; }
+        .app-themed .text-\\[\\#999\\] { color: var(--text-muted) !important; }
+        .app-themed .text-\\[\\#bbb\\] { color: var(--text-primary) !important; }
         @keyframes themeFadeIn {
           from { opacity: 0; transform: scale(0.86); }
           50% { opacity: 1; }
@@ -2081,23 +2113,62 @@ export default function App() {
         )}
 
         <div
-          className="flex flex-col h-screen w-screen overflow-hidden text-zinc-100"
+          className="app-themed flex flex-col h-screen w-screen overflow-hidden"
           style={{
-            backgroundColor: APP_BG,
+            backgroundColor: ui.appBg,
+            color: ui.textPrimary,
             opacity: loaderDone ? 1 : 0,
             pointerEvents: loaderDone ? 'auto' : 'none',
-            transition: 'opacity 700ms cubic-bezier(0.22, 1, 0.36, 1)',
+            transition: 'opacity 700ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease',
+            '--sec-bg': ui.sectionBg,
+            '--text-primary': ui.textPrimary,
+            '--text-muted': ui.textMuted,
+            '--text-subtle': ui.textSubtle,
+            '--tab-hover': ui.tabHover,
+            '--tab-active': ui.tabActive,
+            '--tab-active-text': ui.tabActiveText,
           }}
         >
 
           {/* TOP BAR */}
           <header className="flex items-center justify-between px-6 py-4 flex-shrink-0">
-            <h1 className="text-[15px] font-bold tracking-tight text-white">Glowy</h1>
+            <h1 className="text-[15px] font-normal tracking-tight" style={{ color: ui.textPrimary }}>Glowy</h1>
             <div className="flex gap-2">
+              <div
+                role="tablist"
+                aria-label="UI theme"
+                className="flex items-center gap-1 p-1 rounded-full"
+                style={{ backgroundColor: ui.tabInactive }}
+              >
+                {[
+                  { key: 'system', Icon: Desktop, label: 'System' },
+                  { key: 'light', Icon: Sun, label: 'Light' },
+                  { key: 'dark', Icon: Moon, label: 'Dark' },
+                ].map(({ key, Icon, label }) => {
+                  const active = themePref === key;
+                  return (
+                    <button
+                      key={key}
+                      role="tab"
+                      aria-selected={active}
+                      aria-label={label}
+                      onClick={() => { playSwitch(); setThemePref(key); }}
+                      className="flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200"
+                      style={{
+                        backgroundColor: active ? ui.tabActive : 'transparent',
+                        color: active ? ui.tabActiveText : ui.textSubtle,
+                      }}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  );
+                })}
+              </div>
               <button
                 onClick={() => { playSwitch(); handleExportSVG(); }}
                 disabled={isRecording}
-                className="flex items-center gap-2 px-4 py-2 bg-[#1e1e1e] hover:bg-[#282828] text-[#999] rounded-full transition-colors duration-200 font-medium text-[12px] disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-full transition-colors duration-200 font-normal text-[12px] disabled:opacity-50"
+                style={{ backgroundColor: ui.tabInactive, color: ui.textMuted }}
               >
                 <ArrowCircleDown className="w-3.5 h-3.5" />
                 Export SVG
@@ -2105,7 +2176,7 @@ export default function App() {
               <button
                 onClick={() => { playSwitch(); handleExportVideo(); }}
                 disabled={isRecording}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-bold text-[12px] disabled:cursor-not-allowed ${isRecording
+                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isRecording
                   ? 'bg-[#2a2a2a] text-[#999]'
                   : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
                   }`}
@@ -2137,10 +2208,13 @@ export default function App() {
                   <button
                     onClick={() => { playHover(); handleTabClick(id); }}
                     aria-label={label}
-                    className={`w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center ${isActive
-                      ? 'bg-[#00FF48] text-[#181818]'
-                      : 'bg-[#1e1e1e] text-white hover:bg-[#252525]'
-                      }`}
+                    className="w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center"
+                    style={{
+                      backgroundColor: isActive ? '#00FF48' : ui.tabInactive,
+                      color: isActive ? '#181818' : ui.textPrimary,
+                    }}
+                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                    onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = ui.tabInactive; }}
                   >
                     <Icon className="w-[95%] h-[95%]" />
                   </button>
@@ -2152,18 +2226,27 @@ export default function App() {
             {/* TAB PANEL — vertically centred, auto-height, hidden by default */}
             <div
               ref={panelRef}
-              className={`absolute left-[88px] top-1/2 w-[280px] bg-[#181818] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+              className={`panel-themed absolute left-[88px] top-1/2 w-[280px] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
                 }`}
               style={{
+                backgroundColor: ui.panelBg,
+                color: ui.textPrimary,
                 maxHeight: 'calc(100% - 16px)',
                 transform: `translateY(-50%) translateX(${panelOpen ? '0px' : '16px'})`,
+                '--sec-bg': ui.sectionBg,
+                '--text-primary': ui.textPrimary,
+                '--text-muted': ui.textMuted,
+                '--text-subtle': ui.textSubtle,
+                '--tab-hover': ui.tabHover,
+                '--tab-active': ui.tabActive,
+                '--tab-active-text': ui.tabActiveText,
               }}
             >
               <div key={activeTab} className="tab-fade-in-left flex flex-col flex-1 min-h-0">
 
                 {/* PANEL TITLE — matches the active tab */}
                 <div className="px-4 pt-4 pb-2">
-                  <h2 className="text-[#00FF48] text-[12px] font-bold tracking-tight">
+                  <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#00FF48' }}>
                     {TABS.find((t) => t.id === activeTab)?.label}
                   </h2>
                 </div>
@@ -2172,8 +2255,8 @@ export default function App() {
                 <div className="panel-scroll flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2 flex-1 min-h-0">
 
                   {/* PRESETS SECTION */}
-                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                    <label className="text-[11px] font-semibold text-white mb-2 block">Presets</label>
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
+                    <label className="text-[11px] font-normal text-white mb-2 block">Presets</label>
                     <div className="flex justify-between">
                       {Object.entries(FORMATS).map(([key, { label, icon: Icon }]) => {
                         const isActive = format === key;
@@ -2182,12 +2265,12 @@ export default function App() {
                             key={key}
                             onClick={() => { playSwitch(); setFormat(key); }}
                             className={`flex flex-col items-center justify-center gap-1.5 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
-                              ? 'bg-[#2a2a2a] text-white'
-                              : 'bg-transparent text-[#666] hover:bg-[#252525] hover:text-[#999]'
+                              ? 'bg-[var(--tab-active)] text-[var(--tab-active-text)]'
+                              : 'bg-transparent text-[var(--text-subtle)] hover:bg-[var(--tab-hover)] hover:text-[var(--text-muted)]'
                               }`}
                           >
                             <Icon className="w-5 h-5" />
-                            <span className="text-[11px] font-medium leading-none">{label}</span>
+                            <span className="text-[11px] font-normal leading-none">{label}</span>
                           </button>
                         );
                       })}
@@ -2195,8 +2278,8 @@ export default function App() {
                   </div>
 
                   {/* COLOR THEME SECTION */}
-                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
-                    <label className="text-[11px] font-semibold text-white mb-2 block">Color Theme</label>
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
+                    <label className="text-[11px] font-normal text-white mb-2 block">Color Theme</label>
                     <div className="flex justify-between">
                       {Object.entries(THEMES).map(([key, t]) => {
                         const isActive = colorTheme === key;
@@ -2205,8 +2288,8 @@ export default function App() {
                             key={key}
                             onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
                             className={`flex flex-col items-center justify-center gap-2 px-1 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
-                              ? 'bg-[#2a2a2a]'
-                              : 'bg-transparent hover:bg-[#252525]'
+                              ? 'bg-[var(--tab-active)]'
+                              : 'bg-transparent hover:bg-[var(--tab-hover)]'
                               }`}
                           >
                             <div className="flex justify-center">
@@ -2218,12 +2301,12 @@ export default function App() {
                                     backgroundColor: c,
                                     marginLeft: i === 0 ? 0 : -2,
                                     zIndex: 3 - i,
-                                    boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
+                                    boxShadow: 'none',
                                   }}
                                 />
                               ))}
                             </div>
-                            <span className={`text-[11px] font-medium text-center leading-none ${isActive ? 'text-white' : 'text-[#666]'
+                            <span className={`text-[11px] font-normal text-center leading-none ${isActive ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)]'
                               }`}>{t.label}</span>
                           </button>
                         );
@@ -2234,7 +2317,7 @@ export default function App() {
                   {/* CLASSIC MODE CONTROLS (Pattern only) */}
                   {activeTab === 'neonPattern' && (
                     <>
-                      <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                      <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                         <DirectionPad
                           label="Dot Direction"
                           direction={direction}
@@ -2242,7 +2325,7 @@ export default function App() {
                         />
                       </div>
 
-                      <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                      <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                         <Slider
                           label="Thickness"
                           min={0.5} max={5} step={0.1}
@@ -2260,7 +2343,7 @@ export default function App() {
                         />
                       </div>
 
-                      <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                      <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                         <DirectionPad
                           label="Gradient Pos"
                           direction={gradientPos}
@@ -2273,7 +2356,7 @@ export default function App() {
 
                   {/* SHAPE COUNT (Spectrum / Waves / Pulse) */}
                   {activeTab !== 'neonPattern' && (
-                    <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                    <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                       <Slider
                         label={activeTab === 'glass' ? 'Rings' : 'Columns'}
                         min={activeTab === 'glass' ? 5 : 4}
@@ -2287,7 +2370,7 @@ export default function App() {
                   )}
 
                   {/* ANIMATION TOGGLE */}
-                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                     <Switch
                       label="Animate Effect"
                       checked={isAnimated}
@@ -2296,7 +2379,7 @@ export default function App() {
                   </div>
 
                   {/* DASHED LINES TOGGLE */}
-                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                     <Switch
                       label="Dashed Lines"
                       checked={showDashed}
@@ -2305,7 +2388,7 @@ export default function App() {
                   </div>
 
                   {/* NOISE TOGGLE */}
-                  <div className="bg-[#1e1e1e] rounded-[16px] p-3">
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                     <Switch
                       label="Noise"
                       checked={showNoise}
@@ -2322,7 +2405,7 @@ export default function App() {
               positioned above it so it doesn't shift the centre point) */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="relative pointer-events-auto">
-                <span className="absolute -top-7 left-1 text-[13px] font-semibold text-[#888] select-none">
+                <span className="absolute -top-7 left-1 text-[13px] font-normal text-[#888] select-none">
                   {FORMATS[format].label}
                 </span>
                 <div ref={fadeWrapRef} style={{ display: 'inline-block' }}>
@@ -2362,7 +2445,7 @@ export default function App() {
                               backgroundColor: c,
                               marginLeft: i === 0 ? 0 : -2,
                               zIndex: 3 - i,
-                              boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${isActive ? `, 0 0 6px ${c}66` : ''}`,
+                              boxShadow: 'none',
                             }}
                           />
                         ))}
@@ -2372,12 +2455,12 @@ export default function App() {
                       <button
                         key={key}
                         onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
-                        className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#1e1e1e]'}`}
+                        className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[var(--tab-active)]' : 'bg-transparent hover:bg-[var(--tab-hover)]'}`}
                         style={{ width: 70, height: 70 }}
                       >
                         <div className="flex flex-col items-center gap-2">
                           {dots}
-                          <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${isActive ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>{label}</span>
+                          <span className={`text-[12px] font-normal leading-none transition-colors duration-300 ${isActive ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>{label}</span>
                         </div>
                       </button>
                     );
@@ -2398,7 +2481,7 @@ export default function App() {
                         preview: [j.gradientStart, j.gradientMid || j.gradientEnd, j.gradientEnd],
                       });
                     }}
-                    className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${customTheme ? 'bg-[#1e1e1e]' : 'bg-transparent hover:bg-[#1e1e1e]'}`}
+                    className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${customTheme ? 'bg-[var(--tab-active)]' : 'bg-transparent hover:bg-[var(--tab-hover)]'}`}
                     style={{ width: 70, height: 70 }}
                   >
                     <div className="flex flex-col items-center gap-2">
@@ -2411,12 +2494,12 @@ export default function App() {
                               backgroundColor: c,
                               marginLeft: i === 0 ? 0 : -2,
                               zIndex: 3 - i,
-                              boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.08)${customTheme ? `, 0 0 6px ${c}66` : ''}`,
+                              boxShadow: 'none',
                             }}
                           />
                         ))}
                       </div>
-                      <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${customTheme ? 'text-white' : 'text-[#666] group-hover:text-[#bbb]'}`}>Random</span>
+                      <span className={`text-[12px] font-normal leading-none transition-colors duration-300 ${customTheme ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>Random</span>
                     </div>
                   </button>
                 </div>
