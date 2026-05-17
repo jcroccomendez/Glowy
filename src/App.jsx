@@ -2110,7 +2110,7 @@ export default function App() {
           from { opacity: 0; transform: translateX(-16px); }
           to { opacity: 1; transform: translateX(0); }
         }
-        .tab-fade-in-left { animation: fadeInLeft 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+        .tab-fade-in-left { animation: fadeInLeft 200ms cubic-bezier(0.22, 1, 0.36, 1); }
         @keyframes canvasFadeInUp {
           from { opacity: 0; transform: scale(0.96); }
           to { opacity: 1; transform: scale(1); }
@@ -2284,14 +2284,14 @@ export default function App() {
             <div
               ref={panelRef}
               key={activeTab}
-              className={`panel-themed tab-fade-in-left absolute left-[88px] top-0 bottom-0 my-auto w-[280px] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+              className={`panel-themed tab-fade-in-left absolute left-[88px] top-0 bottom-0 my-auto w-[280px] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
                 }`}
               style={{
                 backgroundColor: ui.panelBg,
                 color: ui.textPrimary,
                 maxHeight: 'calc(100% - 16px)',
                 height: 'fit-content',
-                transform: `translateX(${panelOpen ? '0px' : '16px'})`,
+                transform: `translateX(${panelOpen ? '0px' : '-16px'})`,
                 '--sec-bg': ui.sectionBg,
                 '--text-primary': ui.textPrimary,
                 '--text-muted': ui.textMuted,
@@ -2626,9 +2626,9 @@ export default function App() {
 
               <div className="flex flex-col gap-2 mb-5">
                 {[
-                  { key: 'x', Icon: XLogo, label: 'Share on X', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent('Just made something with Glowy ✨')}&url=${encodeURIComponent(window.location.href)}` },
-                  { key: 'fb', Icon: FacebookLogo, label: 'Share on Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}` },
-                  { key: 'li', Icon: LinkedinLogo, label: 'Share on LinkedIn', url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}` },
+                  { key: 'x', Icon: XLogo, label: 'Share on X', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent('I just designed a stunning gradient with @glowy_app — open-source, free, and ridiculously fun. Make yours in seconds ✨')}&url=${encodeURIComponent(window.location.href)}` },
+                  { key: 'fb', Icon: FacebookLogo, label: 'Share on Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent('Just made a beautiful gradient with Glowy — free, fast, and built for creators. Try it 👇')}` },
+                  { key: 'li', Icon: LinkedinLogo, label: 'Share on LinkedIn', url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&summary=${encodeURIComponent('Discovered Glowy — a free creative tool that turns simple controls into bold, brand-ready visuals. Worth a look for designers and marketers alike.')}` },
                 ].map(({ key, Icon, label, url }) => (
                   <a
                     key={key}
@@ -2652,7 +2652,7 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="pt-4 text-center" style={{ borderTop: `1px solid ${ui.border}` }}>
+              <div className="pt-4 text-center" style={{ borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}` }}>
                 <p className="text-[12px] font-normal" style={{ color: ui.textSubtle }}>
                   Made with Love by{' '}
                   <a
