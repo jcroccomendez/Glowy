@@ -18,8 +18,8 @@ const THEMES = {
     label: 'Neon',
     bg: '#062F2C',
     gradientStart: '#2482F1',
-    gradientEnd: '#00FF48',
-    preview: ['#062F2C', '#2482F1', '#00FF48'],
+    gradientEnd: '#00F345',
+    preview: ['#062F2C', '#2482F1', '#00F345'],
   },
   midnight: {
     label: 'Prism',
@@ -302,7 +302,7 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
     const cycleNeon = {
       ...THEMES.neon,
       gradientStart: '#1DB954',
-      gradientEnd: '#00FF48',
+      gradientEnd: '#00F345',
     };
     const themesCycle = [cycleNeon, THEMES.midnight, THEMES.ember, ...randomSample];
     const hexToRgb = (h) => {
@@ -636,7 +636,7 @@ const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v
         }}
         className="w-full h-[2px] rounded-full appearance-none cursor-pointer focus:outline-none"
         style={{
-          background: `linear-gradient(to right, #00FF48 0%, #00FF48 ${percentage}%, #333 ${percentage}%, #333 100%)`
+          background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${percentage}%, #333 ${percentage}%, #333 100%)`
         }}
       />
     </div>
@@ -656,11 +656,11 @@ const Switch = ({ label, checked, onChange, icon }) => {
       </div>
       <button
         onClick={toggle}
-        className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[#00FF48]' : 'bg-[#333]'
+        className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[var(--accent)]' : 'bg-[#333]'
           }`}
       >
         <span
-          className={`inline-block h-[14px] w-[14px] transform rounded-full transition-transform duration-200 shadow-sm ${checked ? 'translate-x-[18px] bg-[#181818]' : 'translate-x-0.5 bg-[#666]'
+          className={`inline-block h-[14px] w-[14px] transform rounded-full transition-transform duration-200 shadow-sm ${checked ? 'translate-x-[18px] bg-[var(--accent-inverse)]' : 'translate-x-0.5 bg-[#666]'
             }`}
         />
       </button>
@@ -676,7 +676,7 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
     const isActive = direction === dir;
     const base = `absolute transition-colors duration-200 ${isDisabled ? 'opacity-10 cursor-not-allowed' : 'cursor-pointer'}`;
 
-    const activeColor = "bg-[#00FF48]";
+    const activeColor = "bg-[var(--accent)]";
     const inactiveColor = "bg-[#333] hover:bg-[#444]";
 
     let shape = "";
@@ -734,7 +734,7 @@ export default function App() {
   const uiTheme = themePref === 'system' ? (systemDark ? 'dark' : 'light') : themePref;
   const isLight = uiTheme === 'light';
   const ui = {
-    appBg: isLight ? '#fbfbfb' : '#0d0d0d',
+    appBg: isLight ? '#fbfbfb' : '#141414',
     panelBg: isLight ? '#ececec' : '#181818',
     sectionBg: isLight ? '#f7f7f7' : '#1e1e1e',
     tabInactive: isLight ? '#ececec' : '#1e1e1e',
@@ -745,6 +745,8 @@ export default function App() {
     textMuted: isLight ? '#5F5F66' : '#999999',
     textSubtle: isLight ? '#8A8A93' : '#666666',
     border: isLight ? '#D4D4D8' : '#3A3A3A',
+    accent: isLight ? '#000000' : '#FFFFFF',
+    accentInverse: isLight ? '#FFFFFF' : '#000000',
   };
 
   // Preload all UI sounds on first paint
@@ -2112,7 +2114,7 @@ export default function App() {
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          background: #00FF48;
+          background: var(--accent);
           border: none;
           cursor: pointer;
         }
@@ -2120,7 +2122,7 @@ export default function App() {
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          background: #00FF48;
+          background: var(--accent);
           border: none;
           cursor: pointer;
         }
@@ -2146,11 +2148,13 @@ export default function App() {
             '--tab-hover': ui.tabHover,
             '--tab-active': ui.tabActive,
             '--tab-active-text': ui.tabActiveText,
+            '--accent': ui.accent,
+            '--accent-inverse': ui.accentInverse,
           }}
         >
 
           {/* TOP BAR */}
-          <header className="relative flex items-center justify-between px-6 py-4 flex-shrink-0">
+          <header className="relative flex items-center justify-between px-6 pt-4 pb-0 flex-shrink-0">
             <img src="/logo.png" alt="Glowy" className="h-8 w-8 object-contain" />
             <div className="flex items-center gap-3">
               <div
@@ -2199,8 +2203,11 @@ export default function App() {
                 disabled={isRecording}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isRecording
                   ? 'bg-[#2a2a2a] text-[#999]'
-                  : 'bg-[#00FF48] text-[#181818] hover:bg-[#00FF48]/90'
+                  : isLight
+                    ? 'bg-[#161616] hover:bg-[#161616]/90'
+                    : 'bg-white hover:bg-white/90'
                   }`}
+                style={!isRecording ? { color: isLight ? '#FFFFFF' : '#000000' } : undefined}
               >
                 {isRecording ? (
                   <>
@@ -2232,8 +2239,8 @@ export default function App() {
                     aria-label={label}
                     className="w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center"
                     style={{
-                      backgroundColor: isActive ? '#00FF48' : ui.tabInactive,
-                      color: isActive ? '#181818' : ui.textPrimary,
+                      backgroundColor: isActive ? (isLight ? '#161616' : '#FFFFFF') : ui.tabInactive,
+                      color: isActive ? (isLight ? '#FFFFFF' : '#000000') : ui.textPrimary,
                     }}
                     onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = ui.tabHover; }}
                     onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = ui.tabInactive; }}
@@ -2262,13 +2269,15 @@ export default function App() {
                 '--tab-hover': ui.tabHover,
                 '--tab-active': ui.tabActive,
                 '--tab-active-text': ui.tabActiveText,
+            '--accent': ui.accent,
+            '--accent-inverse': ui.accentInverse,
               }}
             >
               <div key={activeTab} className="tab-fade-in-left flex flex-col flex-1 min-h-0">
 
                 {/* PANEL TITLE — matches the active tab */}
                 <div className="px-4 pt-4 pb-2">
-                  <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#00FF48' }}>
+                  <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#00F345' }}>
                     {TABS.find((t) => t.id === activeTab)?.label}
                   </h2>
                 </div>
@@ -2435,13 +2444,14 @@ export default function App() {
                     ref={containerRef}
                     onMouseMove={handleMouseMove}
                     onMouseLeave={handleMouseLeave}
-                    className="relative shadow-2xl overflow-hidden"
+                    className="relative overflow-hidden"
                     style={{
                       aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
                       maxHeight: 'calc(100vh - 140px)',
                       maxWidth: 'calc(100vw - 160px)',
                       transformStyle: 'preserve-3d',
                       willChange: 'transform',
+                      boxShadow: 'none',
                       borderRadius: 16,
                       backgroundColor: (customTheme || THEMES[colorTheme] || THEMES.neon).bg,
                     }}
