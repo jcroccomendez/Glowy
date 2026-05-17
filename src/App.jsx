@@ -9,6 +9,9 @@ const IS_MOBILE = typeof window !== 'undefined' && (('ontouchstart' in window) |
 const MOBILE_DPR = 1;
 const MOBILE_FPS = 30;
 
+// Cache noise canvases per format so format changes don't re-allocate huge ImageData
+const noiseCacheByFormat = new Map();
+
 // Color Themes
 const THEMES = {
   neon: {
@@ -197,7 +200,7 @@ const NeonplaceLogo = ({ className }) => (
   </div>
 );
 
-const Loader = ({ onDone, onFadeStart }) => {
+const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
   const canvasRef = useRef(null);
   const cardRef = useRef(null);
   const overlayRef = useRef(null);
@@ -240,12 +243,17 @@ const Loader = ({ onDone, onFadeStart }) => {
   useEffect(() => {
     let raf;
     const tick = () => {
+      if (document.hidden) { raf = requestAnimationFrame(tick); return; }
       const t = tiltRef.current;
-      t.rx += (t.trx - t.rx) * 0.12;
-      t.ry += (t.tryY - t.ry) * 0.12;
-      const el = cardRef.current;
-      if (el) {
-        el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+      const dx = t.trx - t.rx;
+      const dy = t.tryY - t.ry;
+      if (Math.abs(dx) > 0.005 || Math.abs(dy) > 0.005) {
+        t.rx += dx * 0.12;
+        t.ry += dy * 0.12;
+        const el = cardRef.current;
+        if (el) {
+          el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -323,9 +331,10 @@ const Loader = ({ onDone, onFadeStart }) => {
 
     let raf;
     const startTime = performance.now();
-    const SLOT_MS = 1200;
-    const FADE_MS = 300;
+    const SLOT_MS = 400;
+    const FADE_MS = 250;
     const draw = (time) => {
+      if (document.hidden) { raf = requestAnimationFrame(draw); return; }
       try {
         const elapsed = time - startTime;
         const mPos = mousePosRef.current;
@@ -511,7 +520,7 @@ const Loader = ({ onDone, onFadeStart }) => {
 
   return (
     <div
-      style={{ backgroundColor: APP_BG }}
+      style={{ backgroundColor: bgColor }}
       className={`fixed inset-0 z-[100] overflow-hidden flex items-center justify-center transition-opacity duration-[600ms] ease-out ${shown && !hiding ? 'opacity-100' : 'opacity-0'}`}
     >
       <div
@@ -590,7 +599,8 @@ const Tooltip = ({ label, side = 'right', children }) => {
       {children}
       <span
         role="tooltip"
-        className={`pointer-events-none absolute ${sideClasses[side]} h-[30px] px-4 inline-flex items-center bg-[#1e1e1e] text-white text-[12px] font-regular rounded-full whitespace-nowrap shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-150 z-50`}
+        className={`pointer-events-none absolute ${sideClasses[side]} h-[30px] px-4 inline-flex items-center text-[12px] font-regular rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-150 z-50`}
+        style={{ backgroundColor: '#1e1e1e', color: '#FFFFFF' }}
       >
         {label}
       </span>
@@ -680,8 +690,8 @@ const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
 
   return (
     <div className="flex items-center justify-between">
-      <label className="text-[11px] font-normal text-white">{label}</label>
-      <div className="relative w-24 h-14 bg-[#222] rounded-xl flex items-center justify-center">
+      <label className="text-[11px] font-normal text-[var(--text-primary)]">{label}</label>
+      <div className="relative w-24 h-14 bg-[var(--tab-active)] rounded-xl flex items-center justify-center">
         <div className="relative w-4 h-4 pointer-events-none opacity-30">
           <div className="absolute top-1/2 left-0 w-full h-px bg-[#666] -translate-y-1/2"></div>
           <div className="absolute left-1/2 top-0 w-px h-full bg-[#666] -translate-x-1/2"></div>
@@ -708,7 +718,7 @@ export default function App() {
   const [customTheme, setCustomTheme] = useState(null);
   const [showDashed, setShowDashed] = useState(true);
   const [showNoise, setShowNoise] = useState(true);
-  const [themePref, setThemePref] = useState('dark'); // 'system' | 'light' | 'dark'
+  const [themePref, setThemePref] = useState('system'); // 'system' | 'light' | 'dark'
   const [systemDark, setSystemDark] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -724,12 +734,12 @@ export default function App() {
   const uiTheme = themePref === 'system' ? (systemDark ? 'dark' : 'light') : themePref;
   const isLight = uiTheme === 'light';
   const ui = {
-    appBg: isLight ? '#F4F4F5' : '#0d0d0d',
-    panelBg: isLight ? '#ECECEE' : '#181818',
-    sectionBg: isLight ? '#DCDCE0' : '#1e1e1e',
-    tabInactive: isLight ? '#DCDCE0' : '#1e1e1e',
-    tabHover: isLight ? '#D4D4D8' : '#252525',
-    tabActive: isLight ? '#D4D4D8' : '#2a2a2a',
+    appBg: isLight ? '#fbfbfb' : '#0d0d0d',
+    panelBg: isLight ? '#ececec' : '#181818',
+    sectionBg: isLight ? '#f7f7f7' : '#1e1e1e',
+    tabInactive: isLight ? '#ececec' : '#1e1e1e',
+    tabHover: isLight ? '#ececec' : '#252525',
+    tabActive: isLight ? '#ececec' : '#2a2a2a',
     tabActiveText: isLight ? '#0A0A0B' : '#FFFFFF',
     textPrimary: isLight ? '#0A0A0B' : '#FFFFFF',
     textMuted: isLight ? '#5F5F66' : '#999999',
@@ -872,12 +882,17 @@ export default function App() {
   useEffect(() => {
     let raf;
     const tick = () => {
+      if (document.hidden) { raf = requestAnimationFrame(tick); return; }
       const t = tiltRef.current;
-      t.rx += (t.trx - t.rx) * 0.12;
-      t.ry += (t.tryY - t.ry) * 0.12;
-      const el = containerRef.current;
-      if (el) {
-        el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+      const dx = t.trx - t.rx;
+      const dy = t.tryY - t.ry;
+      if (Math.abs(dx) > 0.005 || Math.abs(dy) > 0.005) {
+        t.rx += dx * 0.12;
+        t.ry += dy * 0.12;
+        const el = containerRef.current;
+        if (el) {
+          el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -888,17 +903,21 @@ export default function App() {
   // Generate noise pattern + allocate blur offscreen + invalidate dots cache
   useEffect(() => {
     const { width, height } = FORMATS[format];
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    const imgData = ctx.createImageData(width, height);
-    const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const val = Math.random() * 255;
-      data[i] = val; data[i + 1] = val; data[i + 2] = val; data[i + 3] = 255;
+    let canvas = noiseCacheByFormat.get(format);
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.createImageData(width, height);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const val = Math.random() * 255;
+        data[i] = val; data[i + 1] = val; data[i + 2] = val; data[i + 3] = 255;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      noiseCacheByFormat.set(format, canvas);
     }
-    ctx.putImageData(imgData, 0, 0);
     noiseCanvasRef.current = canvas;
 
     // Pre-allocate blur offscreen at 1/4 resolution.
@@ -2061,7 +2080,7 @@ export default function App() {
       <style dangerouslySetInnerHTML={{
         __html: `
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; margin: 0; background: ${APP_BG}; }
+        body { font-family: 'Inter', sans-serif; margin: 0; background: ${ui.appBg}; transition: background-color 300ms ease; }
         @keyframes fadeInLeft {
           from { opacity: 0; transform: translateX(-16px); }
           to { opacity: 1; transform: translateX(0); }
@@ -2109,7 +2128,7 @@ export default function App() {
 
       <IconContext.Provider value={{ weight: 'duotone' }}>
         {!loaderDone && (
-          <Loader onDone={() => setLoaderDone(true)} />
+          <Loader onDone={() => setLoaderDone(true)} bgColor={ui.appBg} />
         )}
 
         <div
@@ -2131,9 +2150,9 @@ export default function App() {
         >
 
           {/* TOP BAR */}
-          <header className="flex items-center justify-between px-6 py-4 flex-shrink-0">
-            <h1 className="text-[15px] font-normal tracking-tight" style={{ color: ui.textPrimary }}>Glowy</h1>
-            <div className="flex gap-2">
+          <header className="relative flex items-center justify-between px-6 py-4 flex-shrink-0">
+            <img src="/logo.png" alt="Glowy" className="h-8 w-8 object-contain" />
+            <div className="flex items-center gap-3">
               <div
                 role="tablist"
                 aria-label="UI theme"
@@ -2164,6 +2183,8 @@ export default function App() {
                   );
                 })}
               </div>
+              <div className="h-5 w-px" style={{ backgroundColor: ui.border }} />
+              <div className="flex gap-2">
               <button
                 onClick={() => { playSwitch(); handleExportSVG(); }}
                 disabled={isRecording}
@@ -2193,6 +2214,7 @@ export default function App() {
                   </>
                 )}
               </button>
+            </div>
             </div>
           </header>
 
