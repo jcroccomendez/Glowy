@@ -2648,13 +2648,13 @@ export default function App() {
 
               <div className="rounded-[12px] p-4 mb-5" style={{ backgroundColor: ui.sectionBg }}>
                 <p className="text-[12px] font-normal leading-relaxed" style={{ color: ui.textSubtle }}>
-                  Every share helps Glowy grow and stay free. Thank you for being part of the community!
+                  Your share keeps Glowy alive and growing — every post helps spread the glow.
                 </p>
               </div>
 
               <div className="pt-4 text-center" style={{ borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}` }}>
                 <p className="text-[12px] font-normal" style={{ color: ui.textSubtle }}>
-                  Made with Love by{' '}
+                  Designed & built by{' '}
                   <a
                     href="https://x.com/javiercrocco"
                     target="_blank"
