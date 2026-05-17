@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X } from '@phosphor-icons/react';
+import { getTokens } from './design-system/tokens';
+import { Tooltip, Slider, Switch, DirectionPad, Modal } from './design-system/components';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
 
@@ -586,131 +588,13 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
   );
 };
 
-// --- TOOLTIP (pill-shaped label that matches the rail button height) ---
-const Tooltip = ({ label, side = 'right', children }) => {
-  const sideClasses = {
-    right: 'left-full top-1/2 ml-2 -translate-y-1/2',
-    left: 'right-full top-1/2 mr-3 -translate-y-1/2',
-    top: 'bottom-full left-1/2 mb-2 -translate-x-1/2',
-    bottom: 'top-full left-1/2 mt-2 -translate-x-1/2',
-  };
-  return (
-    <div className="relative group">
-      {children}
-      <span
-        role="tooltip"
-        className={`pointer-events-none absolute ${sideClasses[side]} h-[30px] px-4 inline-flex items-center text-[12px] font-regular rounded-full whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-150 z-50`}
-        style={{ backgroundColor: 'var(--tab-hover)', color: 'var(--text-primary)' }}
-      >
-        {label}
-      </span>
-    </div>
-  );
-};
-
-// --- COMPONENTS ---
-
-const Slider = ({ label, value, min, max, step, onChange, formatValue = (v) => v }) => {
-  const percentage = ((value - min) / (max - min)) * 100;
-  const [playTick] = useSound('/sounds/rollover6.ogg', { volume: 0.25 });
-  const lastPlayRef = useRef(0);
-  return (
-    <div className="flex flex-col gap-1 mb-1 last:mb-0">
-      <div className="flex justify-between items-center" style={{ marginBottom: 6 }}>
-        <label className="text-[11px] font-normal text-white">{label}</label>
-        <span className="text-[11px] text-[#666] font-mono tabular-nums">{formatValue(value)}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => {
-          onChange(parseFloat(e.target.value));
-          const now = performance.now();
-          if (now - lastPlayRef.current > 40) {
-            lastPlayRef.current = now;
-            playTick();
-          }
-        }}
-        className="w-full h-[2px] rounded-full appearance-none cursor-pointer focus:outline-none"
-        style={{
-          background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${percentage}%, var(--slider-track) ${percentage}%, var(--slider-track) 100%)`
-        }}
-      />
-    </div>
-  );
-};
-
-const Switch = ({ label, checked, onChange, icon }) => {
-  const [playClick] = useSound('/sounds/rollover6.ogg', { volume: 0.4 });
-  const toggle = () => { playClick(); onChange(!checked); };
-  return (
-    <div className="flex items-center justify-between py-1.5">
-      <div className="flex items-center gap-2">
-        {icon && <span className="text-[#666]">{icon}</span>}
-        <label className="text-[12px] font-normal text-white cursor-pointer" onClick={toggle}>
-          {label}
-        </label>
-      </div>
-      <button
-        onClick={toggle}
-        className={`relative inline-flex h-[18px] w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[var(--accent)]' : 'bg-[var(--slider-track)] opacity-60'
-          }`}
-      >
-        <span
-          className={`inline-block h-[14px] w-[14px] transform rounded-full transition-transform duration-200 shadow-sm ${checked ? 'translate-x-[18px] bg-[var(--accent-inverse)]' : 'translate-x-0.5 bg-[#666]'
-            }`}
-        />
-      </button>
-    </div>
-  );
-};
-
-const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) => {
-  const [playClick] = useSound('/sounds/rollover6.ogg', { volume: 0.4 });
-  const handle = (dir) => { if (!disabledDirs.includes(dir)) { playClick(); onChange(dir); } };
-  const getPillClass = (dir) => {
-    const isDisabled = disabledDirs.includes(dir);
-    const isActive = direction === dir;
-    const base = `absolute transition-colors duration-200 ${isDisabled ? 'opacity-10 cursor-not-allowed' : 'cursor-pointer'}`;
-
-    const activeColor = "bg-[var(--accent)]";
-    const inactiveColor = "bg-[var(--accent)] opacity-25 hover:opacity-40";
-
-    let shape = "";
-    if (dir === 'top') shape = "w-1.5 h-4 top-1.5 left-1/2 -translate-x-1/2 rounded-full";
-    if (dir === 'bottom') shape = "w-1.5 h-4 bottom-1.5 left-1/2 -translate-x-1/2 rounded-full";
-    if (dir === 'left') shape = "w-4 h-1.5 left-1.5 top-1/2 -translate-y-1/2 rounded-full";
-    if (dir === 'right') shape = "w-4 h-1.5 right-1.5 top-1/2 -translate-y-1/2 rounded-full";
-
-    return `${base} ${shape} ${isActive ? activeColor : inactiveColor}`;
-  };
-
-  return (
-    <div className="flex items-center justify-between">
-      <label className="text-[11px] font-normal text-[var(--text-primary)]">{label}</label>
-      <div className="relative w-24 h-14 bg-[var(--tab-active)] rounded-xl flex items-center justify-center">
-        <div className="relative w-4 h-4 pointer-events-none opacity-30">
-          <div className="absolute top-1/2 left-0 w-full h-px bg-[#666] -translate-y-1/2"></div>
-          <div className="absolute left-1/2 top-0 w-px h-full bg-[#666] -translate-x-1/2"></div>
-        </div>
-
-        <div onClick={() => handle('top')} className={getPillClass('top')} />
-        <div onClick={() => handle('bottom')} className={getPillClass('bottom')} />
-        <div onClick={() => handle('left')} className={getPillClass('left')} />
-        <div onClick={() => handle('right')} className={getPillClass('right')} />
-      </div>
-    </div>
-  );
-};
-
+// UI primitives (Tooltip, Slider, Switch, DirectionPad) live in
+// src/design-system/components — imported above.
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
   // General state
-  const [format, setFormat] = useState('1:1');
+  const [format, setFormat] = useState('9:16');
   const [isAnimated, setIsAnimated] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [loaderDone, setLoaderDone] = useState(false);
@@ -733,22 +617,7 @@ export default function App() {
   }, []);
   const uiTheme = themePref === 'system' ? (systemDark ? 'dark' : 'light') : themePref;
   const isLight = uiTheme === 'light';
-  const ui = {
-    appBg: isLight ? '#fbfbfb' : '#141414',
-    panelBg: isLight ? '#ececec' : '#181818',
-    sectionBg: isLight ? '#f7f7f7' : '#1e1e1e',
-    tabInactive: isLight ? '#ececec' : '#1e1e1e',
-    tabHover: isLight ? '#e0e0e0' : '#252525',
-    tabActive: isLight ? '#ececec' : '#2a2a2a',
-    tabActiveText: isLight ? '#0A0A0B' : '#FFFFFF',
-    textPrimary: isLight ? '#0A0A0B' : '#FFFFFF',
-    textMuted: isLight ? '#5F5F66' : '#999999',
-    textSubtle: isLight ? '#8A8A93' : '#666666',
-    border: isLight ? '#D4D4D8' : '#3A3A3A',
-    accent: isLight ? '#000000' : '#FFFFFF',
-    accentInverse: isLight ? '#FFFFFF' : '#000000',
-    sliderTrack: isLight ? '#D9D9D9' : '#2A2A2A',
-  };
+  const ui = getTokens(uiTheme);
 
   // Preload all UI sounds on first paint
   useEffect(() => {
@@ -770,15 +639,6 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareModalRender, setShareModalRender] = useState(false);
-  useEffect(() => {
-    if (shareModalOpen) {
-      setShareModalRender(true);
-    } else if (shareModalRender) {
-      const t = setTimeout(() => setShareModalRender(false), 220);
-      return () => clearTimeout(t);
-    }
-  }, [shareModalOpen, shareModalRender]);
   const exportMenuRef = useRef(null);
   useEffect(() => {
     if (!exportMenuOpen) return;
@@ -2582,93 +2442,75 @@ export default function App() {
           </div>
         </div>
 
-        {shareModalRender && (
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center px-4 transition-opacity duration-200 ease-out"
-            style={{
-              backgroundColor: 'rgba(0,0,0,0.45)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              opacity: shareModalOpen ? 1 : 0,
-            }}
+        <Modal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          bgColor={isLight ? '#FFFFFF' : ui.panelBg}
+        >
+          <button
             onClick={() => setShareModalOpen(false)}
+            aria-label="Close"
+            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200"
+            style={{ color: ui.textSubtle }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
-            <div
-              className="w-full max-w-[440px] rounded-[20px] p-8 relative transition-[opacity,transform] duration-200 ease-out"
-              style={{
-                backgroundColor: isLight ? '#FFFFFF' : ui.panelBg,
-                color: ui.textPrimary,
-                opacity: shareModalOpen ? 1 : 0,
-                transform: shareModalOpen ? 'scale(1)' : 'scale(0.96)',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setShareModalOpen(false)}
-                aria-label="Close"
-                className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200"
-                style={{ color: ui.textSubtle }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-              >
-                <X className="w-4 h-4" weight="regular" />
-              </button>
+            <X className="w-4 h-4" weight="regular" />
+          </button>
 
-              <div className="text-center mb-2">
-                <img src="/logo.png" alt="Glowy" className="h-10 w-10 object-contain mx-auto" />
-              </div>
-              <h2 className="text-center text-[20px] font-normal tracking-tight mb-3" style={{ color: ui.textPrimary }}>
-                Your file is ready!
-              </h2>
-              <p className="text-center text-[13px] font-normal leading-relaxed mb-6" style={{ color: ui.textSubtle }}>
-                Glowy is free and built with love. If you enjoyed it, share it with your friends and fellow creators!
-              </p>
-
-              <div className="flex flex-col gap-2 mb-5">
-                {[
-                  { key: 'x', Icon: XLogo, label: 'Share on X', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent('I just designed a stunning gradient with @glowy_app — open-source, free, and ridiculously fun. Make yours in seconds ✨')}&url=${encodeURIComponent(window.location.href)}` },
-                  { key: 'fb', Icon: FacebookLogo, label: 'Share on Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent('Just made a beautiful gradient with Glowy — free, fast, and built for creators. Try it 👇')}` },
-                  { key: 'li', Icon: LinkedinLogo, label: 'Share on LinkedIn', url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&summary=${encodeURIComponent('Discovered Glowy — a free creative tool that turns simple controls into bold, brand-ready visuals. Worth a look for designers and marketers alike.')}` },
-                ].map(({ key, Icon, label, url }) => (
-                  <a
-                    key={key}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-3 rounded-full transition-colors duration-150"
-                    style={{ backgroundColor: ui.tabInactive, color: isLight ? ui.textMuted : ui.textPrimary }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span className="text-[13px] font-normal">{label}</span>
-                  </a>
-                ))}
-              </div>
-
-              <div className="rounded-[12px] p-4 mb-5" style={{ backgroundColor: ui.sectionBg }}>
-                <p className="text-[12px] font-normal leading-relaxed" style={{ color: ui.textSubtle }}>
-                  Your share keeps Glowy alive and growing — every post helps spread the glow.
-                </p>
-              </div>
-
-              <div className="pt-4 text-center" style={{ borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}` }}>
-                <p className="text-[12px] font-normal" style={{ color: ui.textSubtle }}>
-                  Designed & built by{' '}
-                  <a
-                    href="https://x.com/javiercrocco"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                    style={{ color: ui.textPrimary }}
-                  >
-                    Javier Crocco Mendez
-                  </a>
-                </p>
-              </div>
-            </div>
+          <div className="text-center mb-2">
+            <img src="/logo.png" alt="Glowy" className="h-10 w-10 object-contain mx-auto" />
           </div>
-        )}
+          <h2 className="text-center text-[20px] font-normal tracking-tight mb-3" style={{ color: ui.textPrimary }}>
+            Your file is ready!
+          </h2>
+          <p className="text-center text-[13px] font-normal leading-relaxed mb-6" style={{ color: ui.textSubtle }}>
+            Glowy is free and built with love. If you enjoyed it, share it with your friends and fellow creators!
+          </p>
+
+          <div className="flex flex-col gap-2 mb-5">
+            {[
+              { key: 'x', Icon: XLogo, label: 'Share on X', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent('I just designed a stunning gradient with @glowy_app — open-source, free, and ridiculously fun. Make yours in seconds ✨')}&url=${encodeURIComponent(window.location.href)}` },
+              { key: 'fb', Icon: FacebookLogo, label: 'Share on Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent('Just made a beautiful gradient with Glowy — free, fast, and built for creators. Try it 👇')}` },
+              { key: 'li', Icon: LinkedinLogo, label: 'Share on LinkedIn', url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&summary=${encodeURIComponent('Discovered Glowy — a free creative tool that turns simple controls into bold, brand-ready visuals. Worth a look for designers and marketers alike.')}` },
+            ].map(({ key, Icon, label, url }) => (
+              <a
+                key={key}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 rounded-full transition-colors duration-150"
+                style={{ backgroundColor: ui.tabInactive, color: isLight ? ui.textMuted : ui.textPrimary }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="text-[13px] font-normal">{label}</span>
+              </a>
+            ))}
+          </div>
+
+          <div className="rounded-[12px] p-4 mb-5" style={{ backgroundColor: ui.sectionBg }}>
+            <p className="text-[12px] font-normal leading-relaxed" style={{ color: ui.textSubtle }}>
+              Your share keeps Glowy alive and growing — every post helps spread the glow.
+            </p>
+          </div>
+
+          <div className="pt-4 text-center" style={{ borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}` }}>
+            <p className="text-[12px] font-normal" style={{ color: ui.textSubtle }}>
+              Designed & built by{' '}
+              <a
+                href="https://x.com/javiercrocco"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+                style={{ color: ui.textPrimary }}
+              >
+                Javier Crocco Mendez
+              </a>
+            </p>
+          </div>
+        </Modal>
       </IconContext.Provider>
     </>
   );

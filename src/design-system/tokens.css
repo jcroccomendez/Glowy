@@ -1,0 +1,61 @@
+/*
+ * Glowy design tokens as CSS variables.
+ * Imported globally; theme switched by toggling [data-theme="light"|"dark"] on a root.
+ */
+
+:root,
+[data-theme='dark'] {
+  --app-bg: #141414;
+  --panel-bg: #181818;
+  --sec-bg: #1e1e1e;
+  --tab-inactive: #1e1e1e;
+  --tab-hover: #252525;
+  --tab-active: #2a2a2a;
+  --tab-active-text: #ffffff;
+  --text-primary: #ffffff;
+  --text-muted: #999999;
+  --text-subtle: #666666;
+  --border: rgba(255, 255, 255, 0.06);
+  --accent: #ffffff;
+  --accent-inverse: #000000;
+  --slider-track: #2a2a2a;
+  --modal-bg: #181818;
+}
+
+[data-theme='light'] {
+  --app-bg: #fbfbfb;
+  --panel-bg: #ececec;
+  --sec-bg: #f7f7f7;
+  --tab-inactive: #ececec;
+  --tab-hover: #e0e0e0;
+  --tab-active: #ececec;
+  --tab-active-text: #0a0a0b;
+  --text-primary: #0a0a0b;
+  --text-muted: #5f5f66;
+  --text-subtle: #8a8a93;
+  --border: rgba(0, 0, 0, 0.06);
+  --accent: #000000;
+  --accent-inverse: #ffffff;
+  --slider-track: #d9d9d9;
+  --modal-bg: #ffffff;
+}
+
+:root {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+
+  --font-family: 'Inter', sans-serif;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --easing: cubic-bezier(0.22, 1, 0.36, 1);
+}
