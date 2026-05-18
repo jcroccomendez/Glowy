@@ -2294,7 +2294,7 @@ export default function App() {
 
                       <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                         <DirectionPad
-                          label="Gradient Pos"
+                          label="Gradient position"
                           direction={gradientPos}
                           onChange={setGradientPos}
                           disabledDirs={['left', 'right']}
@@ -2327,14 +2327,16 @@ export default function App() {
                     />
                   </div>
 
-                  {/* DASHED LINES TOGGLE */}
-                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
-                    <Switch
-                      label="Dashed Lines"
-                      checked={showDashed}
-                      onChange={setShowDashed}
-                    />
-                  </div>
+                  {/* DASHED LINES TOGGLE — hidden in Pattern tab */}
+                  {activeTab !== 'neonPattern' && (
+                    <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
+                      <Switch
+                        label="Dashed Lines"
+                        checked={showDashed}
+                        onChange={setShowDashed}
+                      />
+                    </div>
+                  )}
 
                   {/* NOISE TOGGLE */}
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
@@ -2466,7 +2468,7 @@ export default function App() {
           const sysSubtle = sysLight ? '#8A8A93' : '#666666';
           return (
             <div
-              className="fixed inset-0 z-[300] flex items-center justify-center px-6"
+              className="fixed inset-0 z-[300] flex items-center justify-center px-[60px]"
               style={{ backgroundColor: sysAppBg }}
             >
               <div className="w-full max-w-[380px] text-center">
