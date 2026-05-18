@@ -248,33 +248,49 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
     const ny = (e.clientY - cardRect.top) / cardRect.height - 0.5;
     tiltRef.current.tryY = nx * 6;   // rotateY range ±3°
     tiltRef.current.trx = -ny * 6;   // rotateX range ±3°
+    startTilt();
+  };
+  const tiltRafRef = useRef(null);
+  const startTilt = () => {
+    if (tiltRafRef.current != null) return;
+    const tick = () => {
+      if (document.hidden) { tiltRafRef.current = requestAnimationFrame(tick); return; }
+      const t = tiltRef.current;
+      const dx = t.trx - t.rx;
+      const dy = t.tryY - t.ry;
+      if (Math.abs(dx) < 0.005 && Math.abs(dy) < 0.005) {
+        t.rx = t.trx; t.ry = t.tryY;
+        const el = cardRef.current;
+        if (el) {
+          el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+        }
+        tiltRafRef.current = null;
+        return;
+      }
+      t.rx += dx * 0.12;
+      t.ry += dy * 0.12;
+      const el = cardRef.current;
+      if (el) {
+        el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+      }
+      tiltRafRef.current = requestAnimationFrame(tick);
+    };
+    tiltRafRef.current = requestAnimationFrame(tick);
   };
   const handleMouseLeave = () => {
     mousePosRef.current = null;
     tiltRef.current.trx = 0;
     tiltRef.current.tryY = 0;
+    startTilt();
   };
 
-  // Spring-eased 3D tilt
+  // Spring-eased 3D tilt — RAF only while in motion
   useEffect(() => {
-    let raf;
-    const tick = () => {
-      if (document.hidden) { raf = requestAnimationFrame(tick); return; }
-      const t = tiltRef.current;
-      const dx = t.trx - t.rx;
-      const dy = t.tryY - t.ry;
-      if (Math.abs(dx) > 0.005 || Math.abs(dy) > 0.005) {
-        t.rx += dx * 0.12;
-        t.ry += dy * 0.12;
-        const el = cardRef.current;
-        if (el) {
-          el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
-        }
-      }
-      raf = requestAnimationFrame(tick);
+    startTilt();
+    return () => {
+      if (tiltRafRef.current != null) cancelAnimationFrame(tiltRafRef.current);
+      tiltRafRef.current = null;
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Trigger the entry fade after first paint
@@ -517,10 +533,15 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
     const start = performance.now();
     const duration = 5200;
     let raf;
+    let lastProgress = -1;
     const tick = (now) => {
       const k = Math.min(1, (now - start) / duration);
       const eased = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-      setProgress(Math.floor(eased * 100));
+      const next = Math.floor(eased * 100);
+      if (next !== lastProgress) {
+        lastProgress = next;
+        setProgress(next);
+      }
       if (k < 1) {
         raf = requestAnimationFrame(tick);
       } else {
@@ -764,35 +785,51 @@ export default function App() {
       const ny = (e.clientY - cr.top) / cr.height - 0.5;
       tiltRef.current.tryY = nx * 6;
       tiltRef.current.trx = -ny * 6;
+      startContainerTilt();
     }
   };
 
-  const handleMouseLeave = () => {
-    mousePosRef.current = null;
-    tiltRef.current.trx = 0;
-    tiltRef.current.tryY = 0;
-  };
-
-  // Spring-eased 3D tilt on canvas container
-  useEffect(() => {
-    let raf;
+  const containerTiltRafRef = useRef(null);
+  const startContainerTilt = () => {
+    if (containerTiltRafRef.current != null) return;
     const tick = () => {
-      if (document.hidden) { raf = requestAnimationFrame(tick); return; }
+      if (document.hidden) { containerTiltRafRef.current = requestAnimationFrame(tick); return; }
       const t = tiltRef.current;
       const dx = t.trx - t.rx;
       const dy = t.tryY - t.ry;
-      if (Math.abs(dx) > 0.005 || Math.abs(dy) > 0.005) {
-        t.rx += dx * 0.12;
-        t.ry += dy * 0.12;
+      if (Math.abs(dx) < 0.005 && Math.abs(dy) < 0.005) {
+        t.rx = t.trx; t.ry = t.tryY;
         const el = containerRef.current;
         if (el) {
           el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
         }
+        containerTiltRafRef.current = null;
+        return;
       }
-      raf = requestAnimationFrame(tick);
+      t.rx += dx * 0.12;
+      t.ry += dy * 0.12;
+      const el = containerRef.current;
+      if (el) {
+        el.style.transform = `perspective(1600px) rotateX(${t.rx.toFixed(2)}deg) rotateY(${t.ry.toFixed(2)}deg)`;
+      }
+      containerTiltRafRef.current = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    containerTiltRafRef.current = requestAnimationFrame(tick);
+  };
+  const handleMouseLeave = () => {
+    mousePosRef.current = null;
+    tiltRef.current.trx = 0;
+    tiltRef.current.tryY = 0;
+    startContainerTilt();
+  };
+
+  // Spring-eased 3D tilt on canvas container — RAF only while in motion
+  useEffect(() => {
+    startContainerTilt();
+    return () => {
+      if (containerTiltRafRef.current != null) cancelAnimationFrame(containerTiltRafRef.current);
+      containerTiltRafRef.current = null;
+    };
   }, []);
 
   // Generate noise pattern + allocate blur offscreen + invalidate dots cache
