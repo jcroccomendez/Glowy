@@ -11,6 +11,20 @@ const IS_MOBILE = typeof window !== 'undefined' && (('ontouchstart' in window) |
 const MOBILE_DPR = 1;
 const MOBILE_FPS = 30;
 
+// iOS WebKit handles ctx.filter and large feGaussianBlur poorly. Detect once
+// and use it ONLY to cap mobile/iOS rendering — desktop path stays untouched.
+const IS_IOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/.test(navigator.userAgent);
+const SUPPORTS_CANVAS_FILTER = (() => {
+  if (typeof document === 'undefined') return false;
+  try {
+    const c = document.createElement('canvas').getContext('2d');
+    c.filter = 'blur(2px)';
+    return c.filter === 'blur(2px)';
+  } catch (_e) {
+    return false;
+  }
+})();
+
 // Cache noise canvases per format so format changes don't re-allocate huge ImageData
 const noiseCacheByFormat = new Map();
 
@@ -439,7 +453,9 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
           const fbStart = lerpHex(themeA.gradientStart, themeB.gradientStart, blend);
           const fbEnd = lerpHex(themeA.gradientEnd, themeB.gradientEnd, blend);
           offCtx.clearRect(0, 0, off.width, off.height);
-          offCtx.filter = `blur(${170 * offS}px)`;
+          // iOS clamps large blur radii — keep effective radius ≤ 40px on iOS
+          // so the loader gradient still reads as blurred, not as a hard ellipse.
+          offCtx.filter = `blur(${(IS_IOS ? Math.min(40, 170 * offS) : 170 * offS)}px)`;
           const grad = offCtx.createLinearGradient(
             (blobX - rx) * offS, blobY * offS,
             (blobX + rx) * offS, blobY * offS,
@@ -843,9 +859,11 @@ export default function App() {
     if (blobSpriteRef.current[key]) return blobSpriteRef.current[key];
     const { width, height } = FORMATS[format] || FORMATS.post;
     const SS = Math.max(width, height);
-    const blurSD = SS * 0.157;
-
-    const rasterPx = Math.min(2048, Math.round(SS * 1.5));
+    // iOS WebKit silently clamps large stdDeviation in feGaussianBlur and
+    // struggles with 2048² rasters. Cap aggressively on iOS only — desktop
+    // keeps full fidelity.
+    const blurSD = IS_IOS ? Math.min(120, SS * 0.10) : SS * 0.157;
+    const rasterPx = IS_IOS ? 1024 : Math.min(2048, Math.round(SS * 1.5));
     const cacheCanvas = document.createElement('canvas');
     cacheCanvas.width = rasterPx;
     cacheCanvas.height = rasterPx;
@@ -872,7 +890,10 @@ export default function App() {
       ctx.globalAlpha = 1;
       return;
     }
-    // SVG sprite still loading — fall back to ctx.filter path for first frames
+    // SVG sprite still loading — fall back to ctx.filter path for first frames.
+    // Skip entirely on iOS / browsers without canvas filter to avoid drawing a
+    // sharp ellipse that looks broken. Sprite usually loads within ~50ms.
+    if (!SUPPORTS_CANVAS_FILTER || IS_IOS) return;
     const off = blurOffscreenRef.current;
     if (!off) return;
     const { canvas, ctx: offCtx, scale: s } = off;
