@@ -650,6 +650,7 @@ export default function App() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [mobileWarningOpen, setMobileWarningOpen] = useState(IS_MOBILE);
   const exportMenuRef = useRef(null);
   useEffect(() => {
     if (!exportMenuOpen) return;
@@ -2457,6 +2458,29 @@ export default function App() {
 
           </div>
         </div>
+
+        {mobileWarningOpen && (() => {
+          const sysLight = !systemDark;
+          const sysAppBg = sysLight ? '#fbfbfb' : '#141414';
+          const sysText = sysLight ? '#0A0A0B' : '#FFFFFF';
+          const sysSubtle = sysLight ? '#8A8A93' : '#666666';
+          return (
+            <div
+              className="fixed inset-0 z-[300] flex items-center justify-center px-6"
+              style={{ backgroundColor: sysAppBg }}
+            >
+              <div className="w-full max-w-[380px] text-center">
+                <img src="/favicon.png" alt="Glowy" className="h-[74px] w-auto object-contain mx-auto mb-4" />
+                <h2 className="text-[20px] font-normal tracking-tight mb-3" style={{ color: sysText }}>
+                  Best on desktop
+                </h2>
+                <p className="text-[13px] font-normal leading-relaxed" style={{ color: sysSubtle }}>
+                  Glowy shines on a bigger screen. Open it on desktop for the full experience.
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         <Modal
           open={shareModalOpen}
