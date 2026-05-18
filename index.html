@@ -2,11 +2,73 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Glowy</title>
+
+    <!-- Primary SEO -->
+    <title>Glowy — Animated Gradient & Neon Backdrop Creator</title>
+    <meta name="description" content="Glowy is a free in-browser studio for animated neon gradients, dot patterns, waves, and pulses. Design, animate, and export editable SVG or MP4 in seconds — no signup, no server." />
+    <meta name="keywords" content="gradient generator, animated gradient, neon background, svg export, mp4 export, gradient creator, glowy, design tool, social media backgrounds, instagram post, video gradient" />
+    <meta name="author" content="Javier Crocco Mendez" />
+    <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fbfbfb" media="(prefers-color-scheme: light)" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://neon-theme-creator.vercel.app/" />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Open Graph (Facebook, LinkedIn) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Glowy" />
+    <meta property="og:title" content="Glowy — Animated Gradient & Neon Backdrop Creator" />
+    <meta property="og:description" content="Free in-browser studio for animated neon gradients, dot patterns, waves, and pulses. Export editable SVG or MP4 in seconds — no signup." />
+    <meta property="og:url" content="https://neon-theme-creator.vercel.app/" />
+    <meta property="og:image" content="https://neon-theme-creator.vercel.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Glowy animated gradient preview" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@javiercrocco" />
+    <meta name="twitter:creator" content="@javiercrocco" />
+    <meta name="twitter:title" content="Glowy — Animated Gradient & Neon Backdrop Creator" />
+    <meta name="twitter:description" content="Free in-browser studio for animated neon gradients. Export editable SVG or MP4 in seconds." />
+    <meta name="twitter:image" content="https://neon-theme-creator.vercel.app/og-image.png" />
+
+    <!-- Performance hints -->
+    <link rel="preload" as="image" href="/favicon.png" />
     <link rel="preload" as="audio" href="/sounds/type_02.wav" type="audio/wav" />
     <link rel="preload" as="audio" href="/sounds/rollover6.ogg" type="audio/ogg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- JSON-LD: SoftwareApplication -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Glowy",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Web",
+        "url": "https://neon-theme-creator.vercel.app/",
+        "image": "https://neon-theme-creator.vercel.app/og-image.png",
+        "description": "Free in-browser studio for animated neon gradients, dot patterns, waves, and pulses. Export editable SVG or MP4.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Person",
+          "name": "Javier Crocco Mendez",
+          "url": "https://x.com/javiercrocco"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

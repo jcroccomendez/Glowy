@@ -551,7 +551,7 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
           height: 351.369,
           flexShrink: 0,
           background: '#052825',
-          padding: 44,
+          padding: 50,
           borderRadius: 16,
           boxShadow: '0 4px 116px rgba(0,0,0,0.24)',
           transformStyle: 'preserve-3d',
@@ -583,7 +583,7 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
             display: 'inline-block',
           }}
         >
-          Animated gradients.<br />Editable SVG.<br />Zero install.
+          Built for anyone who<br />needs a nice background
         </div>
         <div
           className="relative mt-auto rounded-full overflow-hidden"

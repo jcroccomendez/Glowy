@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /sounds/
+
+Sitemap: https://neon-theme-creator.vercel.app/sitemap.xml
