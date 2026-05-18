@@ -551,17 +551,12 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
           ref={overlayRef}
           className="absolute inset-0 pointer-events-none"
         />
-        <div
-          className="relative text-white"
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '15px',
-            fontWeight: 700,
-            lineHeight: '1',
-          }}
-        >
-          Glowy
-        </div>
+        <img
+          src="/glowydark.png"
+          alt="Glowy"
+          className="relative object-contain self-start mr-auto"
+          style={{ height: 22, width: 'auto' }}
+        />
         <div
           className="relative text-white mt-3"
           style={{
@@ -2039,7 +2034,7 @@ export default function App() {
 
           {/* TOP BAR */}
           <header className="relative flex items-center justify-between px-6 pt-4 pb-0 flex-shrink-0">
-            <img src="/logo.png" alt="Glowy" className="h-8 w-8 object-contain" />
+            <img src={isLight ? '/glowylight.png' : '/glowydark.png'} alt="Glowy" className="h-[22px] w-auto object-contain" />
             <div className="flex items-center gap-3">
               <div
                 role="tablist"
@@ -2459,7 +2454,7 @@ export default function App() {
           </button>
 
           <div className="text-center mb-2">
-            <img src="/logo.png" alt="Glowy" className="h-10 w-10 object-contain mx-auto" />
+            <img src="/favicon.png" alt="Glowy" className="h-[74px] w-auto object-contain mx-auto" />
           </div>
           <h2 className="text-center text-[20px] font-normal tracking-tight mb-3" style={{ color: ui.textPrimary }}>
             Your file is ready!
