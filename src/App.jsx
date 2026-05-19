@@ -629,6 +629,9 @@ export default function App() {
   const [format, setFormat] = useState('9:16');
   const [isAnimated, setIsAnimated] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [svgExporting, setSvgExporting] = useState(false);
+  const [svgProgress, setSvgProgress] = useState(0);
   const [loaderDone, setLoaderDone] = useState(false);
   const [shapeCount, setShapeCount] = useState(9);
   const [customTheme, setCustomTheme] = useState(null);
@@ -1655,7 +1658,17 @@ export default function App() {
   }, [drawScene, format]);
 
   // --- EXPORT SVG ---
-  const handleExportSVG = () => {
+  const handleExportSVG = async () => {
+    if (svgExporting) return;
+    setSvgExporting(true);
+    setSvgProgress(0);
+    // Yield so the button can paint the loading state before the sync work blocks
+    await new Promise((r) => setTimeout(r, 30));
+    // Visual ramp before the (blocking) SVG serialization runs
+    for (const p of [15, 35, 55, 75]) {
+      setSvgProgress(p);
+      await new Promise((r) => setTimeout(r, 60));
+    }
     const state = stateRef.current;
     const theme = state.customTheme || THEMES[state.colorTheme] || THEMES.neon;
     const { width, height } = FORMATS[state.format];
@@ -1922,9 +1935,13 @@ export default function App() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `neon-theme-creator-${state.format}.svg`;
+    setSvgProgress(100);
+    await new Promise((r) => setTimeout(r, 120));
     a.click();
     URL.revokeObjectURL(url);
     setShareModalOpen(true);
+    setSvgExporting(false);
+    setSvgProgress(0);
   };
 
   // --- EXPORT MP4 VIDEO (High Quality Offline) ---
@@ -1976,6 +1993,8 @@ export default function App() {
       // Force the animation intro to restart for the video
       introStartTimeRef.current = baseTime;
 
+      setVideoProgress(0);
+      let lastReportedPct = -1;
       for (let i = 0; i < totalFrames; i++) {
         const frameTimeMs = baseTime + (i * (1000 / FPS));
 
@@ -1987,11 +2006,19 @@ export default function App() {
         videoEncoder.encode(videoFrame, { keyFrame });
         videoFrame.close();
 
+        // Report progress to UI (encoding ~80% of total work, mux + flush ~20%)
+        const pct = Math.floor(((i + 1) / totalFrames) * 80);
+        if (pct !== lastReportedPct) {
+          lastReportedPct = pct;
+          setVideoProgress(pct);
+        }
+
         // Pause for a moment to not block the UI completely
         if (i % 5 === 0) {
           await new Promise(r => setTimeout(r, 0));
         }
       }
+      setVideoProgress(90);
 
       await videoEncoder.flush();
       muxer.finalize();
@@ -2002,6 +2029,7 @@ export default function App() {
       let a = document.createElement('a');
       a.href = url;
       a.download = `neon-theme-creator-${stateRef.current.format}.mp4`;
+      setVideoProgress(100);
       a.click();
       URL.revokeObjectURL(url);
       setShareModalOpen(true);
@@ -2011,6 +2039,7 @@ export default function App() {
       alert("Video export error: " + e.message);
     } finally {
       setIsRecording(false);
+      setVideoProgress(0);
     }
   };
 
@@ -2030,6 +2059,21 @@ export default function App() {
           to { opacity: 1; transform: scale(1); }
         }
         .canvas-fade-in-up { animation: canvasFadeInUp 520ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: center bottom; }
+        @keyframes loadingShimmer {
+          0%   { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .loading-shimmer {
+          background-image: linear-gradient(
+            90deg,
+            transparent 0%,
+            color-mix(in srgb, currentColor 22%, transparent) 50%,
+            transparent 100%
+          );
+          background-size: 200% 100%;
+          background-repeat: no-repeat;
+          animation: loadingShimmer 1.6s linear infinite;
+        }
         .panel-scroll::-webkit-scrollbar { width: 4px; }
         .panel-scroll::-webkit-scrollbar-track { background: transparent; }
         .panel-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
@@ -2131,31 +2175,51 @@ export default function App() {
               <div className="flex gap-2">
                 <button
                   onClick={() => { playSwitch(); handleExportSVG(); }}
-                  disabled={isRecording}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full transition-colors duration-200 font-normal text-[12px] disabled:opacity-50"
+                  disabled={isRecording || svgExporting}
+                  className="relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-full transition-colors duration-200 font-normal text-[12px] disabled:cursor-not-allowed"
                   style={{ backgroundColor: ui.tabInactive, color: ui.textMuted }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
+                  onMouseEnter={(e) => { if (!svgExporting) e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                  onMouseLeave={(e) => { if (!svgExporting) e.currentTarget.style.backgroundColor = ui.tabInactive; }}
                 >
-                  <ArrowCircleDown className="w-3.5 h-3.5" />
-                  Download SVG
+                  {svgExporting && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 transition-[width] duration-150 ease-out loading-shimmer"
+                      style={{ width: `${svgProgress}%`, backgroundColor: ui.tabHover, opacity: 0.9 }}
+                    />
+                  )}
+                  <span className="relative flex items-center gap-2">
+                    {svgExporting ? (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                        Exporting… {svgProgress}%
+                      </>
+                    ) : (
+                      <>
+                        <ArrowCircleDown className="w-3.5 h-3.5" />
+                        Download SVG
+                      </>
+                    )}
+                  </span>
                 </button>
                 <button
                   onClick={() => { playSwitch(); handleExportVideo(); }}
-                  disabled={isRecording}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isRecording
-                    ? 'bg-[#2a2a2a] text-[#999]'
-                    : isLight
-                      ? 'bg-[#161616] hover:bg-[#161616]/90'
-                      : 'bg-white hover:bg-white/90'
-                    }`}
-                  style={!isRecording ? { color: isLight ? '#FFFFFF' : '#000000' } : undefined}
+                  disabled={isRecording || svgExporting}
+                  className={`relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isLight ? 'bg-[#161616] hover:bg-[#161616]/90' : 'bg-white hover:bg-white/90'}`}
+                  style={{ color: isLight ? '#FFFFFF' : '#000000' }}
                 >
+                  {isRecording && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 transition-[width] duration-150 ease-out loading-shimmer"
+                      style={{ width: `${videoProgress}%`, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                    />
+                  )}
                   {isRecording ? (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#999] animate-pulse" />
-                      Downloading...
-                    </>
+                    <span className="relative flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                      Exporting… {videoProgress}%
+                    </span>
                   ) : (
                     <>
                       <ArrowCircleDown className="w-3.5 h-3.5" />
