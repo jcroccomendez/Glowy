@@ -1961,7 +1961,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `neon-theme-creator-${format}.svg`;
+    a.download = `Glowy-${format}.svg`;
     setSvgProgress(100);
     await new Promise((r) => setTimeout(r, 120));
     a.click();
@@ -2006,7 +2006,7 @@ export default function App() {
       const url = URL.createObjectURL(pngBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `neon-theme-creator-${format}-${scale}x.png`;
+      a.download = `Glowy-${format}-${scale}x.png`;
       setSvgProgress(100);
       await new Promise((r) => setTimeout(r, 80));
       a.click();
@@ -2115,7 +2115,7 @@ export default function App() {
       let url = URL.createObjectURL(blob);
       let a = document.createElement('a');
       a.href = url;
-      a.download = `neon-theme-creator-${stateRef.current.format}-${targetShort}p.mp4`;
+      a.download = `Glowy-${stateRef.current.format}-${targetShort}p.mp4`;
       setVideoProgress(100);
       a.click();
       URL.revokeObjectURL(url);
