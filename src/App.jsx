@@ -744,6 +744,9 @@ export default function App() {
   const blurOffscreenRef = useRef(null);
   const blobSpriteRef = useRef({});
   const dotsCacheRef = useRef(null);
+  const wavesBufRef = useRef({ key: '', xs: null, ys: null, staticXs: null, breathFactor: null, numCols: 0, numPoints: 0, stride: 0 });
+  const lineGradRef = useRef({ key: '', grad: null });
+  const requestPreviewRedrawRef = useRef(() => {});
   const railRef = useRef(null);
   const panelRef = useRef(null);
   const tiltRef = useRef({ trx: 0, tryY: 0, rx: 0, ry: 0 });
@@ -773,10 +776,11 @@ export default function App() {
     const clickY = e.clientY - rect.top - offsetY;
 
     if (clickX >= 0 && clickX <= drawWidth && clickY >= 0 && clickY <= drawHeight) {
-      mousePosRef.current = {
-        x: (clickX / drawWidth) * canvas.width,
-        y: (clickY / drawHeight) * canvas.height
-      };
+      // Reuse single object — mousemove fires often, avoid per-event allocations
+      const mp = mousePosRef.current || (mousePosRef.current = { x: 0, y: 0 });
+      mp.x = (clickX / drawWidth) * canvas.width;
+      mp.y = (clickY / drawHeight) * canvas.height;
+      requestPreviewRedrawRef.current();
     } else {
       mousePosRef.current = null;
     }
@@ -824,6 +828,8 @@ export default function App() {
     tiltRef.current.trx = 0;
     tiltRef.current.tryY = 0;
     startContainerTilt();
+    // Drive the interactRef weight back to 0; preview loop needs to wake to animate that
+    requestPreviewRedrawRef.current();
   };
 
   // Spring-eased 3D tilt on canvas container — RAF only while in motion
@@ -874,6 +880,7 @@ export default function App() {
   const stateRef = useRef({ direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise });
   useEffect(() => {
     stateRef.current = { direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise };
+    requestPreviewRedrawRef.current();
   }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise]);
 
   // Reset intro animation when changing tabs, theme, or main UI becomes visible
@@ -904,7 +911,9 @@ export default function App() {
     // struggles with 2048² rasters. Cap aggressively on iOS only — desktop
     // keeps full fidelity.
     const blurSD = IS_IOS ? Math.min(120, SS * 0.10) : SS * 0.157;
-    const rasterPx = IS_IOS ? 1024 : Math.min(2048, Math.round(SS * 1.5));
+    // Sprite is a heavily blurred ellipse — high raster res buys no visible gain
+    // and pushes more pixels per frame across N composited draws (17 in Waves).
+    const rasterPx = IS_IOS ? 1024 : Math.min(1024, Math.round(SS));
     const cacheCanvas = document.createElement('canvas');
     cacheCanvas.width = rasterPx;
     cacheCanvas.height = rasterPx;
@@ -955,6 +964,18 @@ export default function App() {
   };
 
   // --- SPECTRUM DRAWING LOGIC ---
+  // Cache the vertical white-fade gradient used by dashed borders; only depends on height + ctx
+  const getCachedVerticalWhiteGradient = (ctx, height) => {
+    const ref = lineGradRef.current;
+    if (ref.key === `${height}` && ref.grad && ref.ctx === ctx) return ref.grad;
+    const grad = ctx.createLinearGradient(0, 0, 0, height);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    grad.addColorStop(0.35, 'rgba(255, 255, 255, 0)');
+    grad.addColorStop(1, '#FFFFFF');
+    lineGradRef.current = { key: `${height}`, grad, ctx };
+    return grad;
+  };
+
   const drawSpectrum = (ctx, width, height, time, state, elapsed) => {
     const theme = state.customTheme || THEMES[state.colorTheme] || THEMES.neon;
     ctx.fillStyle = theme.bg;
@@ -1021,12 +1042,7 @@ export default function App() {
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
-        const lineGrad = ctx.createLinearGradient(0, 0, 0, height);
-        lineGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        lineGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0)');
-        lineGrad.addColorStop(1, '#FFFFFF');
-
-        ctx.strokeStyle = lineGrad;
+        ctx.strokeStyle = getCachedVerticalWhiteGradient(ctx, height);
         ctx.beginPath();
         const borderX = (i + 1) * colWidth;
         ctx.moveTo(borderX, 0);
@@ -1092,35 +1108,50 @@ export default function App() {
     const currentTime = state.animatedTime !== undefined ? state.animatedTime : time;
     const animT = currentTime * 0.00012;
     const numPoints = 60;
+    const stride = numPoints + 1;
+    const totalCols = numCols + 1;
 
-    // Fan warp: columns radiate from upper-left corner outward
-    const getWarpedX = (baseX, y) => {
-      const yRatio = y / height;
-      // Focal point: upper-left area
+    // Reusable buffers: static layout (xs without breath) precomputed once per
+    // (width, height, spectrumCols). Per frame only the breath term is added.
+    const cacheKey = `${width}|${height}|${numCols}|${numPoints}`;
+    let buf = wavesBufRef.current;
+    if (buf.key !== cacheKey) {
+      const total = totalCols * stride;
+      const ys = new Float32Array(total);
+      const staticXs = new Float32Array(total);
+      const breathFactor = new Float32Array(stride);
       const focalX = width * 0.05;
-      // Fan spread: converge at top, spread at bottom
-      const spread = Math.pow(yRatio, 0.7);
-      const targetX = baseX * 1.2;
-      const fanX = focalX + (targetX - focalX) * spread;
-      // Subtle arc curvature
-      const arc = Math.sin(yRatio * Math.PI) * width * 0.035;
-      // Very subtle breathing animation
-      const breath = Math.sin(animT) * width * 0.008 * yRatio;
-      return fanX + arc + breath;
-    };
-
-    // Generate boundary paths (numCols + 1 boundaries)
-    const boundaries = [];
-    for (let col = 0; col <= numCols; col++) {
-      const baseX = startX + col * colWidth;
-      const points = [];
       for (let j = 0; j <= numPoints; j++) {
         const y = (j / numPoints) * height;
-        const x = getWarpedX(baseX, y);
-        points.push({ x, y });
+        const yRatio = y / height;
+        const spread = Math.pow(yRatio, 0.7);
+        const arc = Math.sin(yRatio * Math.PI) * width * 0.035;
+        breathFactor[j] = width * 0.008 * yRatio;
+        for (let col = 0; col <= numCols; col++) {
+          const baseX = startX + col * colWidth;
+          const targetX = baseX * 1.2;
+          const idx = col * stride + j;
+          ys[idx] = y;
+          staticXs[idx] = focalX + (targetX - focalX) * spread + arc;
+        }
       }
-      boundaries.push(points);
+      buf = { key: cacheKey, xs: new Float32Array(total), ys, staticXs, breathFactor, numCols, numPoints, stride };
+      wavesBufRef.current = buf;
     }
+
+    // Per-frame: breath offset only — no object allocations
+    const sinAnim = Math.sin(animT);
+    const xs = buf.xs;
+    const staticXs = buf.staticXs;
+    const breathFactor = buf.breathFactor;
+    for (let j = 0; j <= numPoints; j++) {
+      const breath = sinAnim * breathFactor[j];
+      for (let col = 0; col <= numCols; col++) {
+        const idx = col * stride + j;
+        xs[idx] = staticXs[idx] + breath;
+      }
+    }
+    const ys = buf.ys;
 
     // Draw each warped column (same logic as spectrum)
     for (let i = 0; i < numCols; i++) {
@@ -1133,17 +1164,16 @@ export default function App() {
       let rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
       const pColFade = Math.pow(rawColP, 2);
 
-      // Create clip path: left boundary down, right boundary up
-      const leftBound = boundaries[i];
-      const rightBound = boundaries[i + 1];
-
+      // Clip path from buffered boundary coords
+      const leftBase = i * stride;
+      const rightBase = (i + 1) * stride;
       ctx.beginPath();
-      ctx.moveTo(leftBound[0].x, leftBound[0].y);
-      for (let j = 1; j < leftBound.length; j++) {
-        ctx.lineTo(leftBound[j].x, leftBound[j].y);
+      ctx.moveTo(xs[leftBase], ys[leftBase]);
+      for (let j = 1; j < stride; j++) {
+        ctx.lineTo(xs[leftBase + j], ys[leftBase + j]);
       }
-      for (let j = rightBound.length - 1; j >= 0; j--) {
-        ctx.lineTo(rightBound[j].x, rightBound[j].y);
+      for (let j = stride - 1; j >= 0; j--) {
+        ctx.lineTo(xs[rightBase + j], ys[rightBase + j]);
       }
       ctx.closePath();
       ctx.clip();
@@ -1183,18 +1213,12 @@ export default function App() {
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
-        const borderBound = boundaries[i + 1];
-
-        const lineGrad = ctx.createLinearGradient(0, 0, 0, height);
-        lineGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        lineGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0)');
-        lineGrad.addColorStop(1, '#FFFFFF');
-
-        ctx.strokeStyle = lineGrad;
+        const borderBase = (i + 1) * stride;
+        ctx.strokeStyle = getCachedVerticalWhiteGradient(ctx, height);
         ctx.beginPath();
-        ctx.moveTo(borderBound[0].x, borderBound[0].y);
-        for (let j = 1; j < borderBound.length; j++) {
-          ctx.lineTo(borderBound[j].x, borderBound[j].y);
+        ctx.moveTo(xs[borderBase], ys[borderBase]);
+        for (let j = 1; j < stride; j++) {
+          ctx.lineTo(xs[borderBase + j], ys[borderBase + j]);
         }
         ctx.stroke();
         ctx.restore();
@@ -1322,12 +1346,7 @@ export default function App() {
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
-        const lineGrad = ctx.createLinearGradient(0, 0, 0, height);
-        lineGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        lineGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0)');
-        lineGrad.addColorStop(1, '#FFFFFF');
-
-        ctx.strokeStyle = lineGrad;
+        ctx.strokeStyle = getCachedVerticalWhiteGradient(ctx, height);
         ctx.beginPath();
         ctx.arc(cornerX, cornerY, innerR, 0, Math.PI * 2);
         ctx.stroke();
@@ -1613,10 +1632,11 @@ export default function App() {
 
     let currentScale = 1;
     const applySize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // Cap DPR at 1.5 — full DPR doubles pixel work for negligible visual gain
+      // against the heavy blur sprite which is already lo-res relative to display.
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       const cssW = container.clientWidth;
       if (cssW <= 0) return;
-      // Match backbuffer to displayed pixel size, never upscale beyond logical
       const scale = Math.min((cssW * dpr) / logicalW, 1);
       const targetW = Math.max(1, Math.round(logicalW * scale));
       const targetH = Math.max(1, Math.round(logicalH * scale));
@@ -1630,18 +1650,17 @@ export default function App() {
     const ro = new ResizeObserver(applySize);
     ro.observe(container);
 
-    let animFrame;
+    let animFrame = null;
     const loop = (time) => {
-      animFrame = requestAnimationFrame(loop);
+      // Stop entirely while hidden or while video export runs — restart hooks
+      // (visibilitychange + isRecording state change) call requestRedraw.
+      if (document.hidden || stateRef.current.isRecording) { animFrame = null; return; }
 
-      // Pause completely when tab is hidden
-      if (document.hidden) return;
-      // Pause preview while video export is running — encoder loop drives draws
-      if (stateRef.current.isRecording) return;
-
-      // Cap to ~30fps — halves GPU/CPU work vs 60fps
+      // Adaptive frame budget: 30 fps while interacting, 24 fps for auto anim only
+      const interacting = !!mousePosRef.current || interactRef.current.weight > 0.001;
+      const frameBudget = interacting ? 32 : 41;
       const sinceLast = time - timeStateRef.current.lastTime;
-      if (sinceLast < 32) return;
+      if (sinceLast < frameBudget) { animFrame = requestAnimationFrame(loop); return; }
 
       let dt = sinceLast;
       if (dt > 100) dt = 16;
@@ -1652,28 +1671,45 @@ export default function App() {
         timeStateRef.current.animatedTime += dt;
       }
 
-      // Skip redraw when the scene is fully static:
-      // intro animation done, animation off, no mouse interaction
+      // Fully static: stop the rAF chain entirely. Restart on input or state change
+      // via requestPreviewRedrawRef. This drops idle CPU near-zero vs. burning ~60Hz
+      // wake-ups on a short-circuit return.
       const introAge = introStartTimeRef.current >= 0 ? time - introStartTimeRef.current : 0;
       const introSettled = introAge > 1200;
       const noInteraction = interactRef.current.weight < 0.001 && !mousePosRef.current;
-      if (!state.isAnimated && introSettled && noInteraction) return;
+      if (!state.isAnimated && introSettled && noInteraction) {
+        animFrame = null;
+        return;
+      }
 
       ctx.setTransform(currentScale, 0, 0, currentScale, 0, 0);
       ctx.clearRect(0, 0, logicalW, logicalH);
-      const renderState = { ...state, animatedTime: timeStateRef.current.animatedTime };
-      drawScene(ctx, logicalW, logicalH, time, renderState);
+      // Mutate ref in place — avoids a per-frame object spread alloc
+      stateRef.current.animatedTime = timeStateRef.current.animatedTime;
+      drawScene(ctx, logicalW, logicalH, time);
+      animFrame = requestAnimationFrame(loop);
     };
+
+    const requestRedraw = () => {
+      if (animFrame != null) return;
+      timeStateRef.current.lastTime = performance.now();
+      animFrame = requestAnimationFrame(loop);
+    };
+    requestPreviewRedrawRef.current = requestRedraw;
 
     // Prevent a large dt spike when returning to the tab
     const onVisibilityChange = () => {
-      if (!document.hidden) timeStateRef.current.lastTime = performance.now();
+      if (!document.hidden) {
+        timeStateRef.current.lastTime = performance.now();
+        requestRedraw();
+      }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
-    animFrame = requestAnimationFrame(loop);
+    requestRedraw();
 
     return () => {
+      requestPreviewRedrawRef.current = () => {};
       if (animFrame) cancelAnimationFrame(animFrame);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       ro.disconnect();
