@@ -14,6 +14,9 @@ const MOBILE_FPS = 30;
 // iOS WebKit handles ctx.filter and large feGaussianBlur poorly. Detect once
 // and use it ONLY to cap mobile/iOS rendering — desktop path stays untouched.
 const IS_IOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/.test(navigator.userAgent);
+// Firefox's 2D canvas is CPU-bound for complex clips and large drawImage scaling.
+// Detect once so heavy paths can shed work without affecting Chromium/WebKit.
+const IS_FIREFOX = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
 const SUPPORTS_CANVAS_FILTER = (() => {
   if (typeof document === 'undefined') return false;
   try {
@@ -913,7 +916,8 @@ export default function App() {
     const blurSD = IS_IOS ? Math.min(120, SS * 0.10) : SS * 0.157;
     // Sprite is a heavily blurred ellipse — high raster res buys no visible gain
     // and pushes more pixels per frame across N composited draws (17 in Waves).
-    const rasterPx = IS_IOS ? 1024 : Math.min(1024, Math.round(SS));
+    // Firefox: even smaller raster — its drawImage scaling is slower than Chrome.
+    const rasterPx = IS_IOS ? 1024 : (IS_FIREFOX ? 768 : Math.min(1024, Math.round(SS)));
     const cacheCanvas = document.createElement('canvas');
     cacheCanvas.width = rasterPx;
     cacheCanvas.height = rasterPx;
@@ -1002,6 +1006,9 @@ export default function App() {
       // Ease-in (quadratic)
       const pColFade = Math.pow(rawColP, 2);
 
+      // Invisible during intro pre-fade — skip clip + blob draw entirely
+      if (pColFade < 0.005) { ctx.restore(); continue; }
+
       // Overlap adjacent clips by 1px so AA along the shared edge double-covers
       // and no dark seam shows between columns
       ctx.beginPath();
@@ -1040,7 +1047,7 @@ export default function App() {
       // --- DASHED BORDER BETWEEN COLUMNS ---
       if (state.showDashed !== false && i < numCols - 1) {
         ctx.save();
-        ctx.globalAlpha = pColFade;
+        ctx.globalAlpha = pColFade * 0.55;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
@@ -1109,7 +1116,10 @@ export default function App() {
 
     const currentTime = state.animatedTime !== undefined ? state.animatedTime : time;
     const animT = currentTime * 0.00012;
-    const numPoints = 60;
+    // Firefox uses cached Path2D for clips/strokes (built once per layout),
+    // so the per-frame lineTo cost is gone — we can keep 40 points for smooth
+    // curves without breaking the 30 fps budget.
+    const numPoints = IS_FIREFOX ? 40 : 60;
     const stride = numPoints + 1;
     const totalCols = numCols + 1;
 
@@ -1137,23 +1147,52 @@ export default function App() {
           staticXs[idx] = focalX + (targetX - focalX) * spread + arc;
         }
       }
-      buf = { key: cacheKey, xs: new Float32Array(total), ys, staticXs, breathFactor, numCols, numPoints, stride };
+      // Pre-build Path2D clip + stroke paths. On Firefox these are static
+      // (breath is sub-pixel-imperceptible and skipping it lets the browser
+      // cache the GPU clip rasterization across frames — big win on FF).
+      // Other browsers still update xs per frame for the breath wobble.
+      const clipPaths = new Array(numCols);
+      const strokePaths = new Array(totalCols);
+      if (IS_FIREFOX) {
+        for (let i = 0; i < numCols; i++) {
+          const lb = i * stride;
+          const rb = (i + 1) * stride;
+          const p = new Path2D();
+          p.moveTo(staticXs[lb] - 0.5, ys[lb]);
+          for (let j = 1; j < stride; j++) p.lineTo(staticXs[lb + j] - 0.5, ys[lb + j]);
+          for (let j = stride - 1; j >= 0; j--) p.lineTo(staticXs[rb + j] + 0.5, ys[rb + j]);
+          p.closePath();
+          clipPaths[i] = p;
+        }
+        for (let c = 0; c < totalCols; c++) {
+          const base = c * stride;
+          const p = new Path2D();
+          p.moveTo(staticXs[base], ys[base]);
+          for (let j = 1; j < stride; j++) p.lineTo(staticXs[base + j], ys[base + j]);
+          strokePaths[c] = p;
+        }
+      }
+      buf = { key: cacheKey, xs: new Float32Array(total), ys, staticXs, breathFactor, numCols, numPoints, stride, clipPaths, strokePaths };
       wavesBufRef.current = buf;
     }
 
-    // Per-frame: breath offset only — no object allocations
-    const sinAnim = Math.sin(animT);
+    // Per-frame: breath offset only (skipped on Firefox — Path2D is cached static)
     const xs = buf.xs;
     const staticXs = buf.staticXs;
     const breathFactor = buf.breathFactor;
-    for (let j = 0; j <= numPoints; j++) {
-      const breath = sinAnim * breathFactor[j];
-      for (let col = 0; col <= numCols; col++) {
-        const idx = col * stride + j;
-        xs[idx] = staticXs[idx] + breath;
+    if (!IS_FIREFOX) {
+      const sinAnim = Math.sin(animT);
+      for (let j = 0; j <= numPoints; j++) {
+        const breath = sinAnim * breathFactor[j];
+        for (let col = 0; col <= numCols; col++) {
+          const idx = col * stride + j;
+          xs[idx] = staticXs[idx] + breath;
+        }
       }
     }
     const ys = buf.ys;
+    const clipPaths = buf.clipPaths;
+    const strokePaths = buf.strokePaths;
 
     // Draw each warped column (same logic as spectrum)
     for (let i = 0; i < numCols; i++) {
@@ -1166,20 +1205,25 @@ export default function App() {
       let rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
       const pColFade = Math.pow(rawColP, 2);
 
-      // Clip path from buffered boundary coords. Overlap adjacent clips by 0.5px
-      // on each side along x so AA at shared edges double-covers — no seam.
-      const leftBase = i * stride;
-      const rightBase = (i + 1) * stride;
-      ctx.beginPath();
-      ctx.moveTo(xs[leftBase] - 0.5, ys[leftBase]);
-      for (let j = 1; j < stride; j++) {
-        ctx.lineTo(xs[leftBase + j] - 0.5, ys[leftBase + j]);
+      // Clip path. On Firefox reuse cached Path2D (huge perf win — FF caches
+      // clip rasterization across frames). On Chromium/WebKit build per frame
+      // so the sub-pixel breath wobble stays visible.
+      if (IS_FIREFOX) {
+        ctx.clip(clipPaths[i]);
+      } else {
+        const leftBase = i * stride;
+        const rightBase = (i + 1) * stride;
+        ctx.beginPath();
+        ctx.moveTo(xs[leftBase] - 0.5, ys[leftBase]);
+        for (let j = 1; j < stride; j++) {
+          ctx.lineTo(xs[leftBase + j] - 0.5, ys[leftBase + j]);
+        }
+        for (let j = stride - 1; j >= 0; j--) {
+          ctx.lineTo(xs[rightBase + j] + 0.5, ys[rightBase + j]);
+        }
+        ctx.closePath();
+        ctx.clip();
       }
-      for (let j = stride - 1; j >= 0; j--) {
-        ctx.lineTo(xs[rightBase + j] + 0.5, ys[rightBase + j]);
-      }
-      ctx.closePath();
-      ctx.clip();
 
       // Animated gradient blob (identical to spectrum)
       const delayMs = i * 400;
@@ -1212,18 +1256,22 @@ export default function App() {
       // Dashed border along the right boundary curve
       if (state.showDashed !== false && i < numCols - 1) {
         ctx.save();
-        ctx.globalAlpha = pColFade;
+        ctx.globalAlpha = pColFade * 0.55;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
-        const borderBase = (i + 1) * stride;
         ctx.strokeStyle = getCachedVerticalWhiteGradient(ctx, height);
-        ctx.beginPath();
-        ctx.moveTo(xs[borderBase], ys[borderBase]);
-        for (let j = 1; j < stride; j++) {
-          ctx.lineTo(xs[borderBase + j], ys[borderBase + j]);
+        if (IS_FIREFOX) {
+          ctx.stroke(strokePaths[i + 1]);
+        } else {
+          const borderBase = (i + 1) * stride;
+          ctx.beginPath();
+          ctx.moveTo(xs[borderBase], ys[borderBase]);
+          for (let j = 1; j < stride; j++) {
+            ctx.lineTo(xs[borderBase + j], ys[borderBase + j]);
+          }
+          ctx.stroke();
         }
-        ctx.stroke();
         ctx.restore();
       }
     }
@@ -1347,7 +1395,7 @@ export default function App() {
       // — that would draw a degenerate dot at the corner).
       if (state.showDashed !== false && i > 0 && i <= visibleRings) {
         ctx.save();
-        ctx.globalAlpha = pColFade;
+        ctx.globalAlpha = pColFade * 0.55;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
@@ -1638,9 +1686,11 @@ export default function App() {
     let scaleX = 1;
     let scaleY = 1;
     const applySize = () => {
-      // Cap DPR at 1.5 — full DPR doubles pixel work for negligible visual gain
+      // Cap DPR — full DPR doubles pixel work for negligible visual gain
       // against the heavy blur sprite which is already lo-res relative to display.
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      // Firefox: cap at 1.0 because its compositor + canvas pipeline is much
+      // slower at upscaling large backbuffers than Chromium/WebKit.
+      const dpr = Math.min(window.devicePixelRatio || 1, IS_FIREFOX ? 1.0 : 1.5);
       const cssW = container.clientWidth;
       if (cssW <= 0) return;
       const desired = Math.min((cssW * dpr) / logicalW, 1);
@@ -1666,9 +1716,12 @@ export default function App() {
       // (visibilitychange + isRecording state change) call requestRedraw.
       if (document.hidden || stateRef.current.isRecording) { animFrame = null; return; }
 
-      // Adaptive frame budget: 30 fps while interacting, 24 fps for auto anim only
+      // Adaptive frame budget. Firefox always 30 fps — its render path has
+      // higher per-frame variance, so the 24 fps idle target produces visible
+      // judder. Chromium/WebKit keep 24 fps when only the auto anim drives
+      // motion (no mouse) — saves ~20% CPU and stays smooth there.
       const interacting = !!mousePosRef.current || interactRef.current.weight > 0.001;
-      const frameBudget = interacting ? 32 : 41;
+      const frameBudget = (IS_FIREFOX || interacting) ? 32 : 41;
       const sinceLast = time - timeStateRef.current.lastTime;
       if (sinceLast < frameBudget) { animFrame = requestAnimationFrame(loop); return; }
 
@@ -2067,11 +2120,165 @@ export default function App() {
     }
   };
 
-  // --- EXPORT MP4 VIDEO (High Quality Offline) ---
+  // --- WebCodecs offline encode → MP4 (fast path, Chromium/WebKit) ---
+  const runWebCodecsExport = async (width, height, targetShort) => {
+    if (!window.VideoEncoder) throw new Error('WebCodecs not available');
+
+    const codecCandidates = ['avc1.64002a', 'avc1.4d002a', 'avc1.42002a'];
+    let chosenCodec = null;
+    for (const c of codecCandidates) {
+      try {
+        const probe = await window.VideoEncoder.isConfigSupported({
+          codec: c, width, height, bitrate: 40_000_000, framerate: 30,
+        });
+        if (probe && probe.supported) { chosenCodec = c; break; }
+      } catch (_e) { /* try next */ }
+    }
+    if (!chosenCodec) throw new Error('No supported H.264 profile');
+
+    const muxer = new Muxer({
+      target: new ArrayBufferTarget(),
+      video: { codec: 'avc', width, height },
+      fastStart: false,
+    });
+
+    const pendingChunks = [];
+    let knownDecoderConfig = null;
+    const ensureColorSpace = (cfg) => {
+      if (cfg && !cfg.colorSpace) {
+        cfg.colorSpace = { primaries: 'bt709', transfer: 'bt709', matrix: 'bt709', fullRange: false };
+      }
+      return cfg;
+    };
+    const flushPending = () => {
+      if (!knownDecoderConfig) return;
+      while (pendingChunks.length > 0) {
+        const { chunk, meta } = pendingChunks.shift();
+        const effectiveMeta = (meta && meta.decoderConfig)
+          ? { ...meta, decoderConfig: ensureColorSpace(meta.decoderConfig) }
+          : { decoderConfig: knownDecoderConfig };
+        muxer.addVideoChunk(chunk, effectiveMeta);
+      }
+    };
+    const videoEncoder = new window.VideoEncoder({
+      output: (chunk, meta) => {
+        if (meta && meta.decoderConfig) {
+          knownDecoderConfig = ensureColorSpace({ ...meta.decoderConfig });
+        }
+        pendingChunks.push({ chunk, meta });
+        flushPending();
+      },
+      error: e => console.error(e),
+    });
+
+    let encoderConfig = {
+      codec: chosenCodec, width, height,
+      bitrate: 40_000_000, bitrateMode: 'constant',
+      framerate: 30, latencyMode: 'quality',
+    };
+    try { videoEncoder.configure(encoderConfig); }
+    catch (_e) {
+      encoderConfig.bitrateMode = 'variable';
+      delete encoderConfig.latencyMode;
+      videoEncoder.configure(encoderConfig);
+    }
+
+    const FPS = 30;
+    const totalFrames = FPS * 15;
+    const offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = width;
+    offscreenCanvas.height = height;
+    const ctx = offscreenCanvas.getContext('2d');
+    const baseTime = performance.now();
+    introStartTimeRef.current = baseTime;
+
+    setVideoProgress(0);
+    let lastReportedPct = -1;
+    for (let i = 0; i < totalFrames; i++) {
+      const frameTimeMs = baseTime + (i * (1000 / FPS));
+      ctx.clearRect(0, 0, width, height);
+      drawScene(ctx, width, height, frameTimeMs);
+      const videoFrame = new window.VideoFrame(offscreenCanvas, { timestamp: i * (1000000 / FPS) });
+      videoEncoder.encode(videoFrame, { keyFrame: i % 15 === 0 });
+      videoFrame.close();
+      const pct = Math.floor(((i + 1) / totalFrames) * 80);
+      if (pct !== lastReportedPct) { lastReportedPct = pct; setVideoProgress(pct); }
+      await new Promise(r => setTimeout(r, 0));
+    }
+    setVideoProgress(90);
+    await videoEncoder.flush();
+    flushPending();
+    if (pendingChunks.length > 0) {
+      throw new Error('Encoder did not provide H.264 decoder config');
+    }
+    muxer.finalize();
+    const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
+    return { blob, ext: 'mp4' };
+  };
+
+  // --- MediaRecorder real-time path (Firefox + fallback) ---
+  const runMediaRecorderExport = async (width, height) => {
+    if (typeof MediaRecorder === 'undefined') {
+      throw new Error('MediaRecorder not supported in this browser.');
+    }
+    // mp4/h264 preferred, then webm vp9/vp8.
+    const mimeCandidates = [
+      'video/mp4;codecs=h264',
+      'video/mp4',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ];
+    const mimeType = mimeCandidates.find(m => {
+      try { return MediaRecorder.isTypeSupported(m); } catch (_e) { return false; }
+    });
+    if (!mimeType) throw new Error('No supported MediaRecorder mime type.');
+
+    const offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = width;
+    offscreenCanvas.height = height;
+    const ctx = offscreenCanvas.getContext('2d');
+
+    const FPS = 30;
+    const totalFrames = FPS * 15;
+    const stream = offscreenCanvas.captureStream(FPS);
+    const chunks = [];
+    const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 40_000_000 });
+    rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    const stopped = new Promise(resolve => { rec.onstop = resolve; });
+
+    const baseTime = performance.now();
+    introStartTimeRef.current = baseTime;
+    // Paint first frame before start so the stream has data immediately
+    drawScene(ctx, width, height, baseTime);
+    rec.start();
+
+    setVideoProgress(0);
+    let lastReportedPct = -1;
+    for (let i = 0; i < totalFrames; i++) {
+      const targetWall = baseTime + (i * (1000 / FPS));
+      const now = performance.now();
+      const wait = Math.max(0, targetWall - now);
+      if (wait > 0) await new Promise(r => setTimeout(r, wait));
+      const frameTimeMs = baseTime + (i * (1000 / FPS));
+      ctx.clearRect(0, 0, width, height);
+      drawScene(ctx, width, height, frameTimeMs);
+      const pct = Math.floor(((i + 1) / totalFrames) * 90);
+      if (pct !== lastReportedPct) { lastReportedPct = pct; setVideoProgress(pct); }
+    }
+    await new Promise(r => setTimeout(r, 120));
+    rec.stop();
+    await stopped;
+    setVideoProgress(95);
+    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(chunks, { type: mimeType });
+    return { blob, ext };
+  };
+
+  // --- EXPORT VIDEO — orchestrator picks the best path per browser ---
   const handleExportVideo = async (targetShort = 1080) => {
     if (isRecording) return;
     setIsRecording(true);
-
     if (!stateRef.current.isAnimated) setIsAnimated(true);
 
     const base = FORMATS[stateRef.current.format];
@@ -2080,96 +2287,36 @@ export default function App() {
     const width = Math.round((base.width * factor) / 2) * 2;
     const height = Math.round((base.height * factor) / 2) * 2;
 
-    // Give React a moment to update the state (isRecording = true)
     await new Promise(resolve => setTimeout(resolve, 50));
 
+    let result = null;
     try {
-      let muxer = new Muxer({
-        target: new ArrayBufferTarget(),
-        video: {
-          codec: 'avc',
-          width: width,
-          height: height
-        },
-        fastStart: false
-      });
-
-      let videoEncoder = new window.VideoEncoder({
-        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-        error: e => console.error(e)
-      });
-
-      // High Profile @ Level 4.2 — significantly better gradient compression than
-      // Main Profile, still broadly supported on macOS/iOS/Windows players.
-      // Bitrate bumped to 40 Mbps + CBR for consistent quality across gradients
-      // (gradient content is bandwidth-hungry due to subtle color transitions).
-      videoEncoder.configure({
-        codec: 'avc1.64002a',
-        width: width,
-        height: height,
-        bitrate: 40_000_000,
-        bitrateMode: 'constant',
-        framerate: 30,
-        latencyMode: 'quality',
-      });
-
-      const FPS = 30;
-      const durationSeconds = 15;
-      const totalFrames = FPS * durationSeconds;
-
-      const offscreenCanvas = document.createElement('canvas');
-      offscreenCanvas.width = width;
-      offscreenCanvas.height = height;
-      const ctx = offscreenCanvas.getContext('2d');
-
-      const baseTime = performance.now();
-      // Force the animation intro to restart for the video
-      introStartTimeRef.current = baseTime;
-
-      setVideoProgress(0);
-      let lastReportedPct = -1;
-      for (let i = 0; i < totalFrames; i++) {
-        const frameTimeMs = baseTime + (i * (1000 / FPS));
-
-        ctx.clearRect(0, 0, width, height);
-        drawScene(ctx, width, height, frameTimeMs);
-
-        const videoFrame = new window.VideoFrame(offscreenCanvas, { timestamp: i * (1000000 / FPS) });
-        const keyFrame = (i % 15 === 0);
-        videoEncoder.encode(videoFrame, { keyFrame });
-        videoFrame.close();
-
-        // Report progress to UI (encoding ~80% of total work, mux + flush ~20%)
-        const pct = Math.floor(((i + 1) / totalFrames) * 80);
-        if (pct !== lastReportedPct) {
-          lastReportedPct = pct;
-          setVideoProgress(pct);
-        }
-
-        // Pause for a moment to not block the UI completely
-        if (i % 5 === 0) {
-          await new Promise(r => setTimeout(r, 0));
+      // Firefox's WebCodecs AVC path is unreliable (often omits decoderConfig,
+      // crashing mp4-muxer). Skip it on FF and use MediaRecorder directly.
+      // Chromium/WebKit: try WebCodecs first (fast offline encode → MP4),
+      // fall back to MediaRecorder if anything in the pipeline fails.
+      if (!IS_FIREFOX) {
+        try {
+          result = await runWebCodecsExport(width, height, targetShort);
+        } catch (e) {
+          console.warn('WebCodecs export failed, using MediaRecorder fallback:', e);
         }
       }
-      setVideoProgress(90);
+      if (!result) {
+        result = await runMediaRecorderExport(width, height, targetShort);
+      }
 
-      await videoEncoder.flush();
-      muxer.finalize();
-
-      let buffer = muxer.target.buffer;
-      let blob = new Blob([buffer], { type: 'video/mp4' });
-      let url = URL.createObjectURL(blob);
-      let a = document.createElement('a');
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `Glowy-${stateRef.current.format}-${targetShort}p.mp4`;
+      a.download = `Glowy-${stateRef.current.format}-${targetShort}p.${result.ext}`;
       setVideoProgress(100);
       a.click();
       URL.revokeObjectURL(url);
       setShareModalOpen(true);
-
     } catch (e) {
-      console.error("Video export failed:", e);
-      alert("Video export error: " + e.message);
+      console.error('Video export failed:', e);
+      alert('Video export error: ' + e.message);
     } finally {
       setIsRecording(false);
       setVideoProgress(0);
@@ -2381,7 +2528,7 @@ export default function App() {
                           <Divider />
                           <div className="px-[22px] pt-1.5 pb-1 flex items-center justify-between text-[10px] uppercase tracking-wider" style={sectionStyle}>
                             <span>Video Format</span>
-                            <span className="normal-case tracking-normal">MP4 · H.264 · 30 fps · 15 s</span>
+                            <span className="normal-case tracking-normal">{IS_FIREFOX ? 'WebM · VP9 · 30 fps · 15 s' : 'MP4 · H.264 · 30 fps · 15 s'}</span>
                           </div>
                           {(() => {
                             const base = FORMATS[format];
@@ -2646,9 +2793,12 @@ export default function App() {
                     onMouseLeave={handleMouseLeave}
                     className="relative overflow-hidden"
                     style={{
+                      // Explicit width/height via min() — Firefox does not size
+                      // an inline-block child from `aspect-ratio + max-*` alone,
+                      // so the canvas collapsed in 16:9. min() works everywhere.
+                      width: `min(calc(100vw - 160px), calc((100vh - 140px) * ${FORMATS[format].width} / ${FORMATS[format].height}))`,
+                      height: `min(calc(100vh - 140px), calc((100vw - 160px) * ${FORMATS[format].height} / ${FORMATS[format].width}))`,
                       aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
-                      maxHeight: 'calc(100vh - 140px)',
-                      maxWidth: 'calc(100vw - 160px)',
                       transformStyle: 'preserve-3d',
                       willChange: 'transform',
                       boxShadow: 'none',
