@@ -1603,13 +1603,32 @@ export default function App() {
     if (!canvas || !container) return;
 
     const ctx = canvas.getContext('2d');
-    const { width, height } = FORMATS[stateRef.current.format];
+    const logical = FORMATS[stateRef.current.format];
+    const logicalW = logical.width;
+    const logicalH = logical.height;
 
-    canvas.width = width;
-    canvas.height = height;
     canvas.style.width = '100%';
     canvas.style.height = '100%';
     canvas.style.objectFit = 'contain';
+
+    let currentScale = 1;
+    const applySize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const cssW = container.clientWidth;
+      if (cssW <= 0) return;
+      // Match backbuffer to displayed pixel size, never upscale beyond logical
+      const scale = Math.min((cssW * dpr) / logicalW, 1);
+      const targetW = Math.max(1, Math.round(logicalW * scale));
+      const targetH = Math.max(1, Math.round(logicalH * scale));
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+      currentScale = scale;
+    };
+    applySize();
+    const ro = new ResizeObserver(applySize);
+    ro.observe(container);
 
     let animFrame;
     const loop = (time) => {
@@ -1617,6 +1636,8 @@ export default function App() {
 
       // Pause completely when tab is hidden
       if (document.hidden) return;
+      // Pause preview while video export is running — encoder loop drives draws
+      if (stateRef.current.isRecording) return;
 
       // Cap to ~30fps — halves GPU/CPU work vs 60fps
       const sinceLast = time - timeStateRef.current.lastTime;
@@ -1638,9 +1659,10 @@ export default function App() {
       const noInteraction = interactRef.current.weight < 0.001 && !mousePosRef.current;
       if (!state.isAnimated && introSettled && noInteraction) return;
 
-      ctx.clearRect(0, 0, width, height);
+      ctx.setTransform(currentScale, 0, 0, currentScale, 0, 0);
+      ctx.clearRect(0, 0, logicalW, logicalH);
       const renderState = { ...state, animatedTime: timeStateRef.current.animatedTime };
-      drawScene(ctx, width, height, time, renderState);
+      drawScene(ctx, logicalW, logicalH, time, renderState);
     };
 
     // Prevent a large dt spike when returning to the tab
@@ -1654,6 +1676,7 @@ export default function App() {
     return () => {
       if (animFrame) cancelAnimationFrame(animFrame);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      ro.disconnect();
     };
   }, [drawScene, format]);
 
@@ -2266,7 +2289,7 @@ export default function App() {
                 {exportMenuOpen && !isRecording && !svgExporting && (
                   <div
                     role="menu"
-                    className="absolute right-0 mt-2 w-64 rounded-2xl py-2 z-50"
+                    className="absolute right-0 mt-2 w-[269px] rounded-2xl py-2 z-50"
                     style={{ backgroundColor: isLight ? '#EDEDED' : ui.sectionBg }}
                   >
                     {(() => {
@@ -2289,7 +2312,7 @@ export default function App() {
                       );
                       const Divider = () => <div className="my-1.5 h-px" style={{ backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }} />;
                       const Header = ({ children }) => (
-                        <div className="px-4 pt-1.5 pb-1 text-[10px] uppercase tracking-wider" style={sectionStyle}>{children}</div>
+                        <div className="px-[22px] pt-1.5 pb-1 text-[10px] uppercase tracking-wider" style={sectionStyle}>{children}</div>
                       );
                       const run = (fn) => { playSwitch(); setExportMenuOpen(false); fn(); };
                       return (
@@ -2298,11 +2321,19 @@ export default function App() {
                           <Item label="SVG File" onClick={() => run(() => handleExportSVG())} />
                           <Divider />
                           <Header>PNG Format</Header>
-                          <Item label="PNG 1x" onClick={() => run(() => handleExportPNG(1))} />
-                          <Item label="PNG 2x" onClick={() => run(() => handleExportPNG(2))} />
-                          <Item label="PNG 3x" onClick={() => run(() => handleExportPNG(3))} />
+                          {(() => {
+                            const base = FORMATS[format];
+                            const pngDims = (s) => `${Math.round(base.width * s)}×${Math.round(base.height * s)}`;
+                            return (
+                              <>
+                                <Item label="PNG 1x" hint={pngDims(1)} onClick={() => run(() => handleExportPNG(1))} />
+                                <Item label="PNG 2x" hint={pngDims(2)} onClick={() => run(() => handleExportPNG(2))} />
+                                <Item label="PNG 3x" hint={pngDims(3)} onClick={() => run(() => handleExportPNG(3))} />
+                              </>
+                            );
+                          })()}
                           <Divider />
-                          <div className="px-4 pt-1.5 pb-1 flex items-center justify-between text-[10px] uppercase tracking-wider" style={sectionStyle}>
+                          <div className="px-[22px] pt-1.5 pb-1 flex items-center justify-between text-[10px] uppercase tracking-wider" style={sectionStyle}>
                             <span>Video Format</span>
                             <span className="normal-case tracking-normal">MP4 · H.264 · 30 fps · 15 s</span>
                           </div>
