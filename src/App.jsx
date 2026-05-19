@@ -1002,8 +1002,10 @@ export default function App() {
       // Ease-in (quadratic)
       const pColFade = Math.pow(rawColP, 2);
 
+      // Overlap adjacent clips by 1px so AA along the shared edge double-covers
+      // and no dark seam shows between columns
       ctx.beginPath();
-      ctx.rect(i * colWidth, 0, colWidth, height);
+      ctx.rect(i * colWidth - 0.5, 0, colWidth + 1, height);
       ctx.clip();
 
       const delayMs = i * 400;
@@ -1038,7 +1040,7 @@ export default function App() {
       // --- DASHED BORDER BETWEEN COLUMNS ---
       if (state.showDashed !== false && i < numCols - 1) {
         ctx.save();
-        ctx.globalAlpha = pColFade * 0.5;
+        ctx.globalAlpha = pColFade;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
@@ -1164,16 +1166,17 @@ export default function App() {
       let rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
       const pColFade = Math.pow(rawColP, 2);
 
-      // Clip path from buffered boundary coords
+      // Clip path from buffered boundary coords. Overlap adjacent clips by 0.5px
+      // on each side along x so AA at shared edges double-covers — no seam.
       const leftBase = i * stride;
       const rightBase = (i + 1) * stride;
       ctx.beginPath();
-      ctx.moveTo(xs[leftBase], ys[leftBase]);
+      ctx.moveTo(xs[leftBase] - 0.5, ys[leftBase]);
       for (let j = 1; j < stride; j++) {
-        ctx.lineTo(xs[leftBase + j], ys[leftBase + j]);
+        ctx.lineTo(xs[leftBase + j] - 0.5, ys[leftBase + j]);
       }
       for (let j = stride - 1; j >= 0; j--) {
-        ctx.lineTo(xs[rightBase + j], ys[rightBase + j]);
+        ctx.lineTo(xs[rightBase + j] + 0.5, ys[rightBase + j]);
       }
       ctx.closePath();
       ctx.clip();
@@ -1209,7 +1212,7 @@ export default function App() {
       // Dashed border along the right boundary curve
       if (state.showDashed !== false && i < numCols - 1) {
         ctx.save();
-        ctx.globalAlpha = pColFade * 0.5;
+        ctx.globalAlpha = pColFade;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
@@ -1299,10 +1302,12 @@ export default function App() {
       // Annular clip (outer arc minus inner arc, evenodd via reverse-direction arc)
       const innerR = i * ringStep;
       const outerR = (i + 1) * ringStep;
+      // Overlap adjacent rings by 0.5px on each side so AA along the shared
+      // boundary double-covers — no dark seam between rings.
       ctx.beginPath();
-      ctx.arc(cornerX, cornerY, outerR, 0, Math.PI * 2, false);
+      ctx.arc(cornerX, cornerY, outerR + 0.5, 0, Math.PI * 2, false);
       if (innerR > 0) {
-        ctx.arc(cornerX, cornerY, innerR, 0, Math.PI * 2, true);
+        ctx.arc(cornerX, cornerY, innerR - 0.5, 0, Math.PI * 2, true);
       }
       ctx.clip();
 
@@ -1342,7 +1347,7 @@ export default function App() {
       // — that would draw a degenerate dot at the corner).
       if (state.showDashed !== false && i > 0 && i <= visibleRings) {
         ctx.save();
-        ctx.globalAlpha = pColFade * 0.5;
+        ctx.globalAlpha = pColFade;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
@@ -1630,21 +1635,26 @@ export default function App() {
     canvas.style.height = '100%';
     canvas.style.objectFit = 'contain';
 
-    let currentScale = 1;
+    let scaleX = 1;
+    let scaleY = 1;
     const applySize = () => {
       // Cap DPR at 1.5 — full DPR doubles pixel work for negligible visual gain
       // against the heavy blur sprite which is already lo-res relative to display.
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       const cssW = container.clientWidth;
       if (cssW <= 0) return;
-      const scale = Math.min((cssW * dpr) / logicalW, 1);
-      const targetW = Math.max(1, Math.round(logicalW * scale));
-      const targetH = Math.max(1, Math.round(logicalH * scale));
+      const desired = Math.min((cssW * dpr) / logicalW, 1);
+      const targetW = Math.max(1, Math.round(logicalW * desired));
+      const targetH = Math.max(1, Math.round(logicalH * desired));
       if (canvas.width !== targetW || canvas.height !== targetH) {
         canvas.width = targetW;
         canvas.height = targetH;
       }
-      currentScale = scale;
+      // Use exact ratios so fillRect(0,0,logicalW,logicalH) fully covers the
+      // backbuffer — Math.round above can leave a sub-pixel transparent strip
+      // that the browser samples as a dark fringe at the rounded border.
+      scaleX = targetW / logicalW;
+      scaleY = targetH / logicalH;
     };
     applySize();
     const ro = new ResizeObserver(applySize);
@@ -1682,7 +1692,7 @@ export default function App() {
         return;
       }
 
-      ctx.setTransform(currentScale, 0, 0, currentScale, 0, 0);
+      ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
       ctx.clearRect(0, 0, logicalW, logicalH);
       // Mutate ref in place — avoids a per-frame object spread alloc
       stateRef.current.animatedTime = timeStateRef.current.animatedTime;
