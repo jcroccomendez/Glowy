@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X, CaretDown } from '@phosphor-icons/react';
+import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X, CaretDown, Play, Pause } from '@phosphor-icons/react';
 import { getTokens } from './design-system/tokens';
 import { Tooltip, Slider, Switch, DirectionPad, Modal } from './design-system/components';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
@@ -10,6 +10,7 @@ const APP_BG = '#0d0d0d'; // Unified general app background
 const IS_MOBILE = typeof window !== 'undefined' && (('ontouchstart' in window) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
 const MOBILE_DPR = 1;
 const MOBILE_FPS = 30;
+const LOOP_MS = 8000; // animation loops every 8s — enables seamless export + cache
 
 // iOS WebKit handles ctx.filter and large feGaussianBlur poorly. Detect once
 // and use it ONLY to cap mobile/iOS rendering — desktop path stays untouched.
@@ -631,6 +632,7 @@ export default function App() {
   // General state
   const [format, setFormat] = useState('9:16');
   const [isAnimated, setIsAnimated] = useState(true);
+  const [videoDuration, setVideoDuration] = useState(15); // seconds — 5 | 10 | 15 | 30
   const [isRecording, setIsRecording] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [svgExporting, setSvgExporting] = useState(false);
@@ -656,6 +658,35 @@ export default function App() {
   const uiTheme = themePref === 'system' ? (systemDark ? 'dark' : 'light') : themePref;
   const isLight = uiTheme === 'light';
   const ui = getTokens(uiTheme);
+
+  // Low-power auto-pause: prefers-reduced-motion OR battery <20% on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let cancelled = false;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) { setIsAnimated(false); return; }
+    if (navigator.getBattery) {
+      navigator.getBattery().then((bat) => {
+        if (cancelled) return;
+        if (!bat.charging && bat.level < 0.2) setIsAnimated(false);
+      }).catch(() => {});
+    }
+    return () => { cancelled = true; };
+  }, []);
+
+  // Space toggles play/pause (ignore when typing in inputs or while exporting)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.code !== 'Space') return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (isRecording || svgExporting) return;
+      e.preventDefault();
+      setIsAnimated((v) => !v);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isRecording, svgExporting]);
 
   // Preload all UI sounds on first paint
   useEffect(() => {
@@ -716,6 +747,10 @@ export default function App() {
   const [uploadedImageObj, setUploadedImageObj] = useState(null);
   const [imageScale, setImageScale] = useState(1.0);
 
+  // Invalidate loop snapshot whenever a visual-state-affecting input changes
+  useEffect(() => {
+    loopFrame0Ref.current = null;
+  }, [format, activeTab, colorTheme, customTheme, shapeCount, direction, dotSize, dotSpacing, gradientPos, showDashed, showNoise, isAnimated]);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -742,7 +777,8 @@ export default function App() {
   const formatRef = useRef(null);
   const mousePosRef = useRef(null);
   const interactRef = useRef({ x: 0, y: 0, weight: 0 });
-  const timeStateRef = useRef({ lastTime: performance.now(), animatedTime: 1000 });
+  const timeStateRef = useRef({ lastTime: performance.now(), animatedTime: 0 });
+  const loopFrame0Ref = useRef(null); // snapshot of canvas at start of loop — used to crossfade the wrap
   const liquidCanvasRef = useRef(null);
   const blurOffscreenRef = useRef(null);
   const blobSpriteRef = useRef({});
@@ -1602,8 +1638,9 @@ export default function App() {
     let rx = radius;
     let ry = radius;
 
-    // Organic movement (increased speed)
-    const t = time * 0.0005;
+    // Organic movement (increased speed) — uses looped animatedTime so the
+    // whole canvas loops every LOOP_MS for cached/encode-friendly playback.
+    const t = (state.animatedTime ?? time) * 0.0005;
     let animX = 0, animY = 0;
     if (state.isAnimated) {
       animX = Math.sin(t * 0.5) * (width * 0.25);
@@ -1690,7 +1727,9 @@ export default function App() {
       // against the heavy blur sprite which is already lo-res relative to display.
       // Firefox: cap at 1.0 because its compositor + canvas pipeline is much
       // slower at upscaling large backbuffers than Chromium/WebKit.
-      const dpr = Math.min(window.devicePixelRatio || 1, IS_FIREFOX ? 1.0 : 1.5);
+      // DPR 1.25 — sharper than 1.0 on retina, ~36% fewer pixels than 1.5.
+      // Combined with 20fps idle below, net per-second pixel work ≈ DPR 1.0 @ 24fps.
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
       const cssW = container.clientWidth;
       if (cssW <= 0) return;
       const desired = Math.min((cssW * dpr) / logicalW, 1);
@@ -1711,19 +1750,28 @@ export default function App() {
     ro.observe(container);
 
     let animFrame = null;
+    let forceRender = false;
+    let windowFocused = typeof document !== 'undefined' ? document.hasFocus() : true;
+    let canvasVisible = true;
     const loop = (time) => {
-      // Stop entirely while hidden or while video export runs — restart hooks
-      // (visibilitychange + isRecording state change) call requestRedraw.
-      if (document.hidden || stateRef.current.isRecording) { animFrame = null; return; }
+      // Stop entirely while hidden, window blurred, canvas off-screen, or while video export runs.
+      // Restart hooks (visibilitychange + focus + IntersectionObserver + isRecording state change) call requestRedraw.
+      if (document.hidden || !windowFocused || !canvasVisible || stateRef.current.isRecording) { animFrame = null; return; }
 
       // Adaptive frame budget. Firefox always 30 fps — its render path has
       // higher per-frame variance, so the 24 fps idle target produces visible
       // judder. Chromium/WebKit keep 24 fps when only the auto anim drives
       // motion (no mouse) — saves ~20% CPU and stays smooth there.
+      // Track idle window for adaptive fps
       const interacting = !!mousePosRef.current || interactRef.current.weight > 0.001;
-      const frameBudget = (IS_FIREFOX || interacting) ? 32 : 41;
+      const ts = timeStateRef.current;
+      if (interacting) ts.idleSince = time;
+      else if (ts.idleSince == null) ts.idleSince = time;
+      const idleMs = time - ts.idleSince;
+      // 30fps interacting · 20fps idle <3s · 15fps idle >3s. Crossfade 800ms keeps wrap smooth even at 15fps.
+      const frameBudget = IS_FIREFOX ? 32 : interacting ? 32 : idleMs > 3000 ? 66 : 50;
       const sinceLast = time - timeStateRef.current.lastTime;
-      if (sinceLast < frameBudget) { animFrame = requestAnimationFrame(loop); return; }
+      if (!forceRender && sinceLast < frameBudget) { animFrame = requestAnimationFrame(loop); return; }
 
       let dt = sinceLast;
       if (dt > 100) dt = 16;
@@ -1731,7 +1779,11 @@ export default function App() {
 
       const state = stateRef.current;
       if (state.isAnimated) {
-        timeStateRef.current.animatedTime += dt;
+        const prevAnim = timeStateRef.current.animatedTime;
+        const nextAnim = (prevAnim + dt) % LOOP_MS;
+        // Wrap detected — invalidate snapshot so we capture a fresh t=0 frame
+        if (nextAnim < prevAnim) loopFrame0Ref.current = null;
+        timeStateRef.current.animatedTime = nextAnim;
       }
 
       // Fully static: stop the rAF chain entirely. Restart on input or state change
@@ -1740,20 +1792,47 @@ export default function App() {
       const introAge = introStartTimeRef.current >= 0 ? time - introStartTimeRef.current : 0;
       const introSettled = introAge > 1200;
       const noInteraction = interactRef.current.weight < 0.001 && !mousePosRef.current;
-      if (!state.isAnimated && introSettled && noInteraction) {
+      if (!state.isAnimated && introSettled && noInteraction && !forceRender) {
         animFrame = null;
         return;
       }
+      forceRender = false;
 
       ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
       ctx.clearRect(0, 0, logicalW, logicalH);
       // Mutate ref in place — avoids a per-frame object spread alloc
       stateRef.current.animatedTime = timeStateRef.current.animatedTime;
       drawScene(ctx, logicalW, logicalH, time);
+
+      // Loop wrap crossfade — blend last 500ms of loop toward stored t=0 frame
+      // so the discontinuity at modulo wrap is invisible.
+      if (state.isAnimated) {
+        const at = timeStateRef.current.animatedTime;
+        // Capture t=0 frame in first 50ms of each loop
+        if (loopFrame0Ref.current == null && at < 50) {
+          const snap = document.createElement('canvas');
+          snap.width = canvas.width;
+          snap.height = canvas.height;
+          snap.getContext('2d').drawImage(canvas, 0, 0);
+          loopFrame0Ref.current = snap;
+        }
+        const FADE = 800;
+        if (loopFrame0Ref.current && at > LOOP_MS - FADE) {
+          const k = (at - (LOOP_MS - FADE)) / FADE;
+          const eased = k * k * (3 - 2 * k); // smoothstep
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = eased;
+          ctx.drawImage(loopFrame0Ref.current, 0, 0);
+          ctx.restore();
+        }
+      }
+
       animFrame = requestAnimationFrame(loop);
     };
 
     const requestRedraw = () => {
+      forceRender = true;
       if (animFrame != null) return;
       timeStateRef.current.lastTime = performance.now();
       animFrame = requestAnimationFrame(loop);
@@ -1769,12 +1848,37 @@ export default function App() {
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
+    // Pause RAF when window loses focus (user in another app/window).
+    const onFocus = () => {
+      windowFocused = true;
+      timeStateRef.current.lastTime = performance.now();
+      requestRedraw();
+    };
+    const onBlur = () => { windowFocused = false; };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+
+    // Pause RAF when canvas is scrolled / clipped off-screen.
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        canvasVisible = entry.isIntersecting;
+        if (canvasVisible) {
+          timeStateRef.current.lastTime = performance.now();
+          requestRedraw();
+        }
+      }
+    }, { threshold: 0.01 });
+    io.observe(canvas);
+
     requestRedraw();
 
     return () => {
       requestPreviewRedrawRef.current = () => {};
       if (animFrame) cancelAnimationFrame(animFrame);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+      io.disconnect();
       ro.disconnect();
     };
   }, [drawScene, format]);
@@ -2121,7 +2225,7 @@ export default function App() {
   };
 
   // --- WebCodecs offline encode → MP4 (fast path, Chromium/WebKit) ---
-  const runWebCodecsExport = async (width, height, targetShort) => {
+  const runWebCodecsExport = async (width, height, targetShort, durationSeconds = 15) => {
     if (!window.VideoEncoder) throw new Error('WebCodecs not available');
 
     const codecCandidates = ['avc1.64002a', 'avc1.4d002a', 'avc1.42002a'];
@@ -2184,7 +2288,7 @@ export default function App() {
     }
 
     const FPS = 30;
-    const totalFrames = FPS * 15;
+    const totalFrames = FPS * durationSeconds;
     const offscreenCanvas = document.createElement('canvas');
     offscreenCanvas.width = width;
     offscreenCanvas.height = height;
@@ -2196,6 +2300,7 @@ export default function App() {
     let lastReportedPct = -1;
     for (let i = 0; i < totalFrames; i++) {
       const frameTimeMs = baseTime + (i * (1000 / FPS));
+      stateRef.current.animatedTime = (i * (1000 / FPS)) % LOOP_MS;
       ctx.clearRect(0, 0, width, height);
       drawScene(ctx, width, height, frameTimeMs);
       const videoFrame = new window.VideoFrame(offscreenCanvas, { timestamp: i * (1000000 / FPS) });
@@ -2217,7 +2322,7 @@ export default function App() {
   };
 
   // --- MediaRecorder real-time path (Firefox + fallback) ---
-  const runMediaRecorderExport = async (width, height) => {
+  const runMediaRecorderExport = async (width, height, _targetShort, durationSeconds = 15) => {
     if (typeof MediaRecorder === 'undefined') {
       throw new Error('MediaRecorder not supported in this browser.');
     }
@@ -2240,7 +2345,7 @@ export default function App() {
     const ctx = offscreenCanvas.getContext('2d');
 
     const FPS = 30;
-    const totalFrames = FPS * 15;
+    const totalFrames = FPS * durationSeconds;
     const stream = offscreenCanvas.captureStream(FPS);
     const chunks = [];
     const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 40_000_000 });
@@ -2261,6 +2366,7 @@ export default function App() {
       const wait = Math.max(0, targetWall - now);
       if (wait > 0) await new Promise(r => setTimeout(r, wait));
       const frameTimeMs = baseTime + (i * (1000 / FPS));
+      stateRef.current.animatedTime = (i * (1000 / FPS)) % LOOP_MS;
       ctx.clearRect(0, 0, width, height);
       drawScene(ctx, width, height, frameTimeMs);
       const pct = Math.floor(((i + 1) / totalFrames) * 90);
@@ -2276,7 +2382,7 @@ export default function App() {
   };
 
   // --- EXPORT VIDEO — orchestrator picks the best path per browser ---
-  const handleExportVideo = async (targetShort = 1080) => {
+  const handleExportVideo = async (targetShort = 1080, durationSeconds = videoDuration) => {
     if (isRecording) return;
     setIsRecording(true);
     if (!stateRef.current.isAnimated) setIsAnimated(true);
@@ -2297,13 +2403,13 @@ export default function App() {
       // fall back to MediaRecorder if anything in the pipeline fails.
       if (!IS_FIREFOX) {
         try {
-          result = await runWebCodecsExport(width, height, targetShort);
+          result = await runWebCodecsExport(width, height, targetShort, durationSeconds);
         } catch (e) {
           console.warn('WebCodecs export failed, using MediaRecorder fallback:', e);
         }
       }
       if (!result) {
-        result = await runMediaRecorderExport(width, height, targetShort);
+        result = await runMediaRecorderExport(width, height, targetShort, durationSeconds);
       }
 
       const url = URL.createObjectURL(result.blob);
@@ -2419,6 +2525,20 @@ export default function App() {
           <header className="relative flex items-center justify-between px-6 pt-4 pb-0 flex-shrink-0">
             <img src={isLight ? '/glowylight.png' : '/glowydark.png'} alt="Glowy" className="h-[22px] w-auto object-contain" />
             <div className="flex items-center gap-3">
+              <Tooltip label={isAnimated ? 'Pause (Space)' : 'Play (Space)'} side="bottom">
+                <button
+                  onClick={() => { playSwitch(); setIsAnimated((v) => !v); }}
+                  aria-label={isAnimated ? 'Pause animation' : 'Play animation'}
+                  aria-pressed={!isAnimated}
+                  className="flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-200"
+                  style={{ backgroundColor: ui.tabInactive, color: ui.textPrimary }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
+                >
+                  {isAnimated ? <Pause className="w-4 h-4" weight="fill" /> : <Play className="w-4 h-4" weight="fill" />}
+                </button>
+              </Tooltip>
+              <div className="h-5 w-px" style={{ backgroundColor: ui.border }} />
               <div
                 role="tablist"
                 aria-label="UI theme"
@@ -2528,7 +2648,25 @@ export default function App() {
                           <Divider />
                           <div className="px-[22px] pt-1.5 pb-1 flex items-center justify-between text-[10px] uppercase tracking-wider" style={sectionStyle}>
                             <span>Video Format</span>
-                            <span className="normal-case tracking-normal">{IS_FIREFOX ? 'WebM · VP9 · 30 fps · 15 s' : 'MP4 · H.264 · 30 fps · 15 s'}</span>
+                            <span className="normal-case tracking-normal">{IS_FIREFOX ? `WebM · VP9 · 30 fps · ${videoDuration} s` : `MP4 · H.264 · 30 fps · ${videoDuration} s`}</span>
+                          </div>
+                          <div className="px-3 pb-2">
+                            <div className="flex items-center p-0.5 rounded-full" style={{ backgroundColor: ui.tabInactive }}>
+                              {[3, 5, 8, 15].map((d) => {
+                                const active = videoDuration === d;
+                                return (
+                                  <button
+                                    key={d}
+                                    onClick={() => { playSwitch(); setVideoDuration(d); }}
+                                    className="flex-1 h-6 rounded-full text-[11px] transition-colors"
+                                    style={{
+                                      backgroundColor: active ? (isLight ? '#161616' : '#FFFFFF') : 'transparent',
+                                      color: active ? (isLight ? '#FFFFFF' : '#000000') : ui.textPrimary,
+                                    }}
+                                  >{d}s</button>
+                                );
+                              })}
+                            </div>
                           </div>
                           {(() => {
                             const base = FORMATS[format];
