@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X } from '@phosphor-icons/react';
+import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X, CaretDown } from '@phosphor-icons/react';
 import { getTokens } from './design-system/tokens';
 import { Tooltip, Slider, Switch, DirectionPad, Modal } from './design-system/components';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
@@ -1657,18 +1657,8 @@ export default function App() {
     };
   }, [drawScene, format]);
 
-  // --- EXPORT SVG ---
-  const handleExportSVG = async () => {
-    if (svgExporting) return;
-    setSvgExporting(true);
-    setSvgProgress(0);
-    // Yield so the button can paint the loading state before the sync work blocks
-    await new Promise((r) => setTimeout(r, 30));
-    // Visual ramp before the (blocking) SVG serialization runs
-    for (const p of [15, 35, 55, 75]) {
-      setSvgProgress(p);
-      await new Promise((r) => setTimeout(r, 60));
-    }
+  // --- BUILD SVG STRING (shared by SVG + PNG export) ---
+  const buildSvgString = () => {
     const state = stateRef.current;
     const theme = state.customTheme || THEMES[state.colorTheme] || THEMES.neon;
     const { width, height } = FORMATS[state.format];
@@ -1930,11 +1920,25 @@ export default function App() {
       </svg>
     `;
 
+    return { svgString, width, height, format: state.format };
+  };
+
+  // --- EXPORT SVG ---
+  const handleExportSVG = async () => {
+    if (svgExporting) return;
+    setSvgExporting(true);
+    setSvgProgress(0);
+    await new Promise((r) => setTimeout(r, 30));
+    for (const p of [15, 35, 55, 75]) {
+      setSvgProgress(p);
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    const { svgString, format } = buildSvgString();
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `neon-theme-creator-${state.format}.svg`;
+    a.download = `neon-theme-creator-${format}.svg`;
     setSvgProgress(100);
     await new Promise((r) => setTimeout(r, 120));
     a.click();
@@ -1944,14 +1948,68 @@ export default function App() {
     setSvgProgress(0);
   };
 
+  // --- EXPORT PNG (rasterize SVG at given scale) ---
+  const handleExportPNG = async (scale) => {
+    if (svgExporting) return;
+    setSvgExporting(true);
+    setSvgProgress(0);
+    await new Promise((r) => setTimeout(r, 30));
+    for (const p of [10, 25, 45]) {
+      setSvgProgress(p);
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    try {
+      const { svgString, width, height, format } = buildSvgString();
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const img = new Image();
+      img.decoding = 'sync';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = svgUrl;
+      });
+      setSvgProgress(70);
+      const outW = Math.round(width * scale);
+      const outH = Math.round(height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, outW, outH);
+      URL.revokeObjectURL(svgUrl);
+      setSvgProgress(90);
+      const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      const url = URL.createObjectURL(pngBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `neon-theme-creator-${format}-${scale}x.png`;
+      setSvgProgress(100);
+      await new Promise((r) => setTimeout(r, 80));
+      a.click();
+      URL.revokeObjectURL(url);
+      setShareModalOpen(true);
+    } catch (e) {
+      console.error('PNG export failed:', e);
+      alert('PNG export error: ' + e.message);
+    } finally {
+      setSvgExporting(false);
+      setSvgProgress(0);
+    }
+  };
+
   // --- EXPORT MP4 VIDEO (High Quality Offline) ---
-  const handleExportVideo = async () => {
+  const handleExportVideo = async (targetShort = 1080) => {
     if (isRecording) return;
     setIsRecording(true);
 
     if (!stateRef.current.isAnimated) setIsAnimated(true);
 
-    const { width, height } = FORMATS[stateRef.current.format];
+    const base = FORMATS[stateRef.current.format];
+    const baseShort = Math.min(base.width, base.height);
+    const factor = targetShort / baseShort;
+    const width = Math.round((base.width * factor) / 2) * 2;
+    const height = Math.round((base.height * factor) / 2) * 2;
 
     // Give React a moment to update the state (isRecording = true)
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -1972,12 +2030,18 @@ export default function App() {
         error: e => console.error(e)
       });
 
+      // High Profile @ Level 4.2 — significantly better gradient compression than
+      // Main Profile, still broadly supported on macOS/iOS/Windows players.
+      // Bitrate bumped to 40 Mbps + CBR for consistent quality across gradients
+      // (gradient content is bandwidth-hungry due to subtle color transitions).
       videoEncoder.configure({
-        codec: 'avc1.4d002a', // Main Profile (alta compatibilidad)
+        codec: 'avc1.64002a',
         width: width,
         height: height,
-        bitrate: 15_000_000, // 15 Mbps para alta calidad
-        framerate: 30
+        bitrate: 40_000_000,
+        bitrateMode: 'constant',
+        framerate: 30,
+        latencyMode: 'quality',
       });
 
       const FPS = 30;
@@ -2002,7 +2066,7 @@ export default function App() {
         drawScene(ctx, width, height, frameTimeMs);
 
         const videoFrame = new window.VideoFrame(offscreenCanvas, { timestamp: i * (1000000 / FPS) });
-        const keyFrame = (i % 30 === 0);
+        const keyFrame = (i % 15 === 0);
         videoEncoder.encode(videoFrame, { keyFrame });
         videoFrame.close();
 
@@ -2028,7 +2092,7 @@ export default function App() {
       let url = URL.createObjectURL(blob);
       let a = document.createElement('a');
       a.href = url;
-      a.download = `neon-theme-creator-${stateRef.current.format}.mp4`;
+      a.download = `neon-theme-creator-${stateRef.current.format}-${targetShort}p.mp4`;
       setVideoProgress(100);
       a.click();
       URL.revokeObjectURL(url);
@@ -2172,61 +2236,99 @@ export default function App() {
                 })}
               </div>
               <div className="h-5 w-px" style={{ backgroundColor: ui.border }} />
-              <div className="flex gap-2">
+              <div className="relative" ref={exportMenuRef}>
                 <button
-                  onClick={() => { playSwitch(); handleExportSVG(); }}
-                  disabled={isRecording || svgExporting}
-                  className="relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-full transition-colors duration-200 font-normal text-[12px] disabled:cursor-not-allowed"
-                  style={{ backgroundColor: ui.tabInactive, color: ui.textMuted }}
-                  onMouseEnter={(e) => { if (!svgExporting) e.currentTarget.style.backgroundColor = ui.tabHover; }}
-                  onMouseLeave={(e) => { if (!svgExporting) e.currentTarget.style.backgroundColor = ui.tabInactive; }}
-                >
-                  {svgExporting && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-y-0 left-0 transition-[width] duration-150 ease-out loading-shimmer"
-                      style={{ width: `${svgProgress}%`, backgroundColor: ui.tabHover, opacity: 0.9 }}
-                    />
-                  )}
-                  <span className="relative flex items-center gap-2">
-                    {svgExporting ? (
-                      <>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                        Exporting… {svgProgress}%
-                      </>
-                    ) : (
-                      <>
-                        <ArrowCircleDown className="w-3.5 h-3.5" />
-                        Download SVG
-                      </>
-                    )}
-                  </span>
-                </button>
-                <button
-                  onClick={() => { playSwitch(); handleExportVideo(); }}
+                  onClick={() => { playSwitch(); if (!isRecording && !svgExporting) setExportMenuOpen((v) => !v); }}
                   disabled={isRecording || svgExporting}
                   className={`relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isLight ? 'bg-[#161616] hover:bg-[#161616]/90' : 'bg-white hover:bg-white/90'}`}
                   style={{ color: isLight ? '#FFFFFF' : '#000000' }}
                 >
-                  {isRecording && (
+                  {(isRecording || svgExporting) && (
                     <span
                       aria-hidden="true"
                       className="absolute inset-y-0 left-0 transition-[width] duration-150 ease-out loading-shimmer"
-                      style={{ width: `${videoProgress}%`, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                      style={{ width: `${isRecording ? videoProgress : svgProgress}%`, backgroundColor: 'rgba(255,255,255,0.15)' }}
                     />
                   )}
-                  {isRecording ? (
+                  {(isRecording || svgExporting) ? (
                     <span className="relative flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                      Exporting… {videoProgress}%
+                      Exporting… {isRecording ? videoProgress : svgProgress}%
                     </span>
                   ) : (
-                    <>
+                    <span className="relative flex items-center gap-2">
                       <ArrowCircleDown className="w-3.5 h-3.5" />
-                      Download Video
-                    </>
+                      Export
+                      <CaretDown className="w-3 h-3" />
+                    </span>
                   )}
                 </button>
+                {exportMenuOpen && !isRecording && !svgExporting && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-64 rounded-2xl py-2 z-50"
+                    style={{ backgroundColor: isLight ? '#EDEDED' : ui.sectionBg }}
+                  >
+                    {(() => {
+                      const sectionStyle = { color: ui.textSubtle };
+                      const itemStyle = { color: ui.textPrimary };
+                      const disabledStyle = { color: ui.textSubtle, opacity: 0.5 };
+                      const Item = ({ label, onClick, disabled, hint }) => (
+                        <button
+                          role="menuitem"
+                          onClick={onClick}
+                          disabled={disabled}
+                          className="w-[calc(100%-12px)] mx-1.5 rounded-full text-left px-4 py-2 text-[12px] flex items-center justify-between transition-colors disabled:cursor-not-allowed"
+                          style={disabled ? disabledStyle : itemStyle}
+                          onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          <span>{label}</span>
+                          {hint && <span className="text-[10px]" style={{ color: ui.textSubtle }}>{hint}</span>}
+                        </button>
+                      );
+                      const Divider = () => <div className="my-1.5 h-px" style={{ backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }} />;
+                      const Header = ({ children }) => (
+                        <div className="px-4 pt-1.5 pb-1 text-[10px] uppercase tracking-wider" style={sectionStyle}>{children}</div>
+                      );
+                      const run = (fn) => { playSwitch(); setExportMenuOpen(false); fn(); };
+                      return (
+                        <>
+                          <Header>SVG Format</Header>
+                          <Item label="SVG File" onClick={() => run(() => handleExportSVG())} />
+                          <Divider />
+                          <Header>PNG Format</Header>
+                          <Item label="PNG 1x" onClick={() => run(() => handleExportPNG(1))} />
+                          <Item label="PNG 2x" onClick={() => run(() => handleExportPNG(2))} />
+                          <Item label="PNG 3x" onClick={() => run(() => handleExportPNG(3))} />
+                          <Divider />
+                          <div className="px-4 pt-1.5 pb-1 flex items-center justify-between text-[10px] uppercase tracking-wider" style={sectionStyle}>
+                            <span>Video Format</span>
+                            <span className="normal-case tracking-normal">MP4 · H.264 · 30 fps · 15 s</span>
+                          </div>
+                          {(() => {
+                            const base = FORMATS[format];
+                            const baseShort = Math.min(base.width, base.height);
+                            const dimsFor = (target) => {
+                              const f = target / baseShort;
+                              const w = Math.round((base.width * f) / 2) * 2;
+                              const h = Math.round((base.height * f) / 2) * 2;
+                              return `${w}×${h}`;
+                            };
+                            return (
+                              <>
+                                <Item label="Video 480p" hint={dimsFor(480)} onClick={() => run(() => handleExportVideo(480))} />
+                                <Item label="Video 720p" hint={dimsFor(720)} onClick={() => run(() => handleExportVideo(720))} />
+                                <Item label="Video 1080p" hint={dimsFor(1080)} onClick={() => run(() => handleExportVideo(1080))} />
+                                <Item label="Video 4k" disabled hint="Soon" />
+                              </>
+                            );
+                          })()}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             </div>
           </header>
