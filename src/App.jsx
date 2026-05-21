@@ -2901,8 +2901,7 @@ export default function App() {
                   </h2>
                   {(() => {
                     const dirty = format !== '9:16' || direction !== 'left' || dotSize !== 1.8 || dotSpacing !== 28 || gradientPos !== 'bottom' || colorTheme !== 'neon' || customTheme !== null || shapeCount !== 9 || showDashed !== true || showNoise !== true || waveAmp !== 1 || dashedIntensity !== 1 || uploadedImageSrc !== null || imageScale !== 1.0;
-                    return (
-                  <Tooltip label="Reset" side="left">
+                    const btn = (
                     <button
                       onClick={() => {
                         if (!dirty) return;
@@ -2932,8 +2931,8 @@ export default function App() {
                     >
                       <ArrowCounterClockwise className="w-3.5 h-3.5" weight="regular" />
                     </button>
-                  </Tooltip>
                     );
+                    return dirty ? <Tooltip label="Reset" side="left">{btn}</Tooltip> : btn;
                   })()}
                 </div>
 
@@ -3156,14 +3155,15 @@ export default function App() {
 
                 {/* CANVAS TRANSPORT — independent of fadeWrap so theme/format changes don't replay its enter animation */}
                 <div
-                  className="flex flex-col gap-2"
+                  className="flex flex-col gap-2 self-center"
                   style={{
                     marginTop: 12,
                     padding: '10px 14px 12px',
                     borderRadius: 16,
-                    backgroundColor: ui.sectionBg,
+                    backgroundColor: ui.tabInactive,
                     color: ui.textPrimary,
                     position: 'relative',
+                    width: `min(calc(100vw - 160px), calc((100vh - 220px) * 1080 / 1920))`,
                   }}
                 >
                     <div className="flex items-center justify-between">
