@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X, CaretDown, Play, Pause } from '@phosphor-icons/react';
+import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X, CaretDown, Play, Pause, SkipBack, Repeat, Lightning, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { getTokens } from './design-system/tokens';
 import { Tooltip, Slider, Switch, DirectionPad, Modal } from './design-system/components';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
@@ -10,7 +10,43 @@ const APP_BG = '#0d0d0d'; // Unified general app background
 const IS_MOBILE = typeof window !== 'undefined' && (('ontouchstart' in window) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
 const MOBILE_DPR = 1;
 const MOBILE_FPS = 30;
-const LOOP_MS = 8000; // animation loops every 8s — enables seamless export + cache
+const LOOP_MS = 8000; // default animation cycle — overridable per-session via Animation panel
+
+// Normalized easing curves (t in [0,1] → [0,1]). All map 0→0 and 1→1 so loop wrap stays continuous in position.
+const easeOutBounce = (t) => {
+  const n1 = 7.5625;
+  const d1 = 2.75;
+  if (t < 1 / d1) return n1 * t * t;
+  if (t < 2 / d1) { const x = t - 1.5 / d1; return n1 * x * x + 0.75; }
+  if (t < 2.5 / d1) { const x = t - 2.25 / d1; return n1 * x * x + 0.9375; }
+  const x = t - 2.625 / d1;
+  return n1 * x * x + 0.984375;
+};
+const applyEasing = (mode, t) => {
+  switch (mode) {
+    case 'ease': return t * t * (3 - 2 * t);
+    case 'bounce': return easeOutBounce(t);
+    case 'cubic': return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    case 'quint': return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+    case 'expo': {
+      if (t === 0 || t === 1) return t;
+      return t < 0.5
+        ? Math.pow(2, 20 * t - 10) / 2
+        : (2 - Math.pow(2, -20 * t + 10)) / 2;
+    }
+    case 'back': {
+      const c1 = 1.70158, c3 = c1 + 1;
+      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+    case 'elastic': {
+      const c4 = (2 * Math.PI) / 3;
+      if (t === 0 || t === 1) return t;
+      return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+    }
+    case 'sine': return -(Math.cos(Math.PI * t) - 1) / 2;
+    default: return t;
+  }
+};
 
 // iOS WebKit handles ctx.filter and large feGaussianBlur poorly. Detect once
 // and use it ONLY to cap mobile/iOS rendering — desktop path stays untouched.
@@ -131,6 +167,26 @@ const FORMATS = {
   '9:16': { width: 1080, height: 1920, label: "9:16", name: "Full Portrait" },
   '1:1': { width: 1080, height: 1080, label: "1:1", name: "Square" },
   '16:9': { width: 1920, height: 1080, label: "16:9", name: "Landscape" },
+};
+
+// --- EASING ICON ---
+// Plots the easing curve so the user can compare shapes at a glance.
+const EasingIcon = ({ mode, className }) => {
+  const W = 32, H = 32, PAD = 6;
+  const pts = [];
+  const steps = 40;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const y = applyEasing(mode, t);
+    const px = PAD + t * (W - 2 * PAD);
+    const py = (H - PAD) - ((y + 0.25) / 1.5) * (H - 2 * PAD);
+    pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+  }
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none" className={className} style={{ overflow: 'visible' }}>
+      <polyline points={pts.join(' ')} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 };
 
 // --- TAB ICONS (use currentColor so the active state can flip white → dark) ---
@@ -326,21 +382,13 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
     off.width = Math.max(1, Math.ceil(W / DOWNSCALE));
     off.height = Math.max(1, Math.ceil(H / DOWNSCALE));
 
-    // Cycle through default themes + a sample of brand-inspired random palettes
-    // during the loader. Each slot holds for a moment then quick-fades to the
-    // next so the color shift is unmistakable while the progress fills.
-    const randomSample = ['Apple', 'Instagram', 'Spotify', 'Sunset', 'Aurora', 'Cyber', 'Mint']
-      .map((n) => RANDOM_PALETTES.find((p) => p.label === n))
-      .filter(Boolean)
-      .map((p) => ({ bg: p.bg, gradientStart: p.gradientStart, gradientEnd: p.gradientEnd }));
-    // Force the first cycle slot to read clearly green so the intro opens with
-    // Neon's signature color instead of the blue gradient stop dominating.
+    // Loader shows ONLY the Neon theme — no cycling through other palettes.
     const cycleNeon = {
       ...THEMES.neon,
       gradientStart: '#1DB954',
       gradientEnd: '#00F345',
     };
-    const themesCycle = [cycleNeon, THEMES.midnight, THEMES.ember, ...randomSample];
+    const themesCycle = [cycleNeon];
     const hexToRgb = (h) => {
       const m = h.replace('#', '');
       return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
@@ -440,9 +488,9 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
         }
 
         for (let i = 0; i < numCols; i++) {
-          const colDelayMs = i * 60;
-          const colDurationMs = 800;
-          const rawColP = Math.max(0, Math.min((elapsed - 100 - colDelayMs) / colDurationMs, 1));
+          const colDelayMs = i * 12;
+          const colDurationMs = 280;
+          const rawColP = Math.max(0, Math.min((elapsed - 10 - colDelayMs) / colDurationMs, 1));
           const pColFade = Math.pow(rawColP, 2);
 
           ctx.save();
@@ -535,7 +583,7 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
   // pause briefly, then fade out and notify the parent.
   useEffect(() => {
     const start = performance.now();
-    const duration = 5200;
+    const duration = 700;
     let raf;
     let lastProgress = -1;
     const tick = (now) => {
@@ -553,18 +601,19 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
         setTimeout(() => {
           setHiding(true);
           onFadeStart?.();
-          setTimeout(() => onDone?.(), 600);
-        }, 350);
+          setTimeout(() => onDone?.(), 250);
+        }, 80);
       }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [onDone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
       style={{ backgroundColor: bgColor }}
-      className={`fixed inset-0 z-[100] overflow-hidden flex items-center justify-center transition-opacity duration-[600ms] ease-out ${shown && !hiding ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 z-[100] overflow-hidden flex items-center justify-center transition-opacity duration-[250ms] ease-out ${shown && !hiding ? 'opacity-100' : 'opacity-0'}`}
     >
       <div
         ref={cardRef}
@@ -615,7 +664,7 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
           style={{ width: 160, height: 4, backgroundColor: 'rgba(255,255,255,0.12)' }}
         >
           <div
-            className="h-full rounded-full transition-[width] duration-100 ease-linear"
+            className="h-full rounded-full"
             style={{ width: `${progress}%`, backgroundColor: '#FFFFFF' }}
           />
         </div>
@@ -632,6 +681,27 @@ export default function App() {
   // General state
   const [format, setFormat] = useState('9:16');
   const [isAnimated, setIsAnimated] = useState(true);
+  const [animSpeed, setAnimSpeed] = useState(1);
+  const [easing, setEasing] = useState('linear'); // 'linear' | 'ease' | 'bounce'
+  const [playMode, setPlayMode] = useState('once'); // 'once' | 'loop' | 'pingpong'
+  const [loopDurationMs, setLoopDurationMs] = useState(LOOP_MS);
+  const [animPanelOpen, setAnimPanelOpen] = useState(false);
+  const [playheadMs, setPlayheadMs] = useState(0);
+  const [waveAmp, setWaveAmp] = useState(1);
+  const [dashedIntensity, setDashedIntensity] = useState(1);
+  const fxRef = useRef({ waveAmp: 1, dashedIntensity: 1 });
+  useEffect(() => {
+    fxRef.current.waveAmp = waveAmp;
+    fxRef.current.dashedIntensity = dashedIntensity;
+    requestPreviewRedrawRef.current();
+  }, [waveAmp, dashedIntensity]);
+  const animOptsRef = useRef({ speed: 1, easing: 'linear', playMode: 'once', loopMs: LOOP_MS, dir: 1 });
+  useEffect(() => {
+    animOptsRef.current.speed = animSpeed;
+    animOptsRef.current.easing = easing;
+    animOptsRef.current.playMode = playMode;
+    animOptsRef.current.loopMs = loopDurationMs;
+  }, [animSpeed, easing, playMode, loopDurationMs]);
   const [videoDuration, setVideoDuration] = useState(15); // seconds — 5 | 10 | 15 | 30
   const [isRecording, setIsRecording] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
@@ -682,7 +752,15 @@ export default function App() {
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (isRecording || svgExporting) return;
       e.preventDefault();
-      setIsAnimated((v) => !v);
+      setIsAnimated((v) => {
+        if (v) return false;
+        const cycle = animOptsRef.current.loopMs || LOOP_MS;
+        if (animOptsRef.current.playMode === 'once' && timeStateRef.current.animatedTime >= cycle - 2) {
+          restartAnim();
+          return true;
+        }
+        return true;
+      });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -742,10 +820,55 @@ export default function App() {
     document.addEventListener('mousedown', onMouseDown);
     return () => document.removeEventListener('mousedown', onMouseDown);
   }, [panelOpen]);
+
+  useEffect(() => {
+    if (!animPanelOpen) return;
+    const onMouseDown = (e) => {
+      if (animRailRef.current?.contains(e.target)) return;
+      if (animPanelRef.current?.contains(e.target)) return;
+      setAnimPanelOpen(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [animPanelOpen]);
   const [colorTheme, setColorTheme] = useState('neon');
   const [uploadedImageSrc, setUploadedImageSrc] = useState(null);
   const [uploadedImageObj, setUploadedImageObj] = useState(null);
   const [imageScale, setImageScale] = useState(1.0);
+
+  // Mirror animatedTime → React state so the transport scrubber updates while playing.
+  useEffect(() => {
+    if (!isAnimated) return;
+    let raf;
+    let last = 0;
+    const tick = (now) => {
+      if (now - last >= 33) {
+        last = now;
+        setPlayheadMs(timeStateRef.current.animatedTime);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isAnimated]);
+
+  const seekTo = (ms) => {
+    const cycle = animOptsRef.current.loopMs || LOOP_MS;
+    const v = Math.max(0, Math.min(cycle - 1, ms));
+    timeStateRef.current.animatedTime = v;
+    loopFrame0Ref.current = null;
+    setPlayheadMs(v);
+    requestPreviewRedrawRef.current();
+  };
+
+  const restartAnim = () => {
+    timeStateRef.current.animatedTime = 0;
+    loopFrame0Ref.current = null;
+    animOptsRef.current.dir = 1;
+    setPlayheadMs(0);
+    setIsAnimated(true);
+    requestPreviewRedrawRef.current();
+  };
 
   // Invalidate loop snapshot whenever a visual-state-affecting input changes
   useEffect(() => {
@@ -788,6 +911,8 @@ export default function App() {
   const requestPreviewRedrawRef = useRef(() => {});
   const railRef = useRef(null);
   const panelRef = useRef(null);
+  const animRailRef = useRef(null);
+  const animPanelRef = useRef(null);
   const tiltRef = useRef({ trx: 0, tryY: 0, rx: 0, ry: 0 });
 
   const handleMouseMove = (e) => {
@@ -922,20 +1047,21 @@ export default function App() {
     requestPreviewRedrawRef.current();
   }, [direction, dotSize, dotSpacing, gradientPos, isAnimated, format, isRecording, uploadedImageObj, uploadedImageSrc, activeTab, imageScale, colorTheme, shapeCount, customTheme, showDashed, showNoise]);
 
-  // Reset intro animation when changing tabs, theme, or main UI becomes visible
+  // Intro animation only plays once when the main UI first becomes visible
+  // (after loader). Tab/theme/format changes must not re-trigger it.
   useEffect(() => {
     introStartTimeRef.current = -1;
-  }, [activeTab, loaderDone, colorTheme, customTheme]);
+  }, [loaderDone]);
 
-  // Fade-in-up on the entire canvas wrapper whenever tab, format, theme,
-  // or random theme changes (animation moves the whole rounded card).
+  // Fade-in-up on the canvas wrapper for initial reveal AND tab/theme/format
+  // changes. Does NOT touch play/pause/loop state — purely visual.
   useEffect(() => {
     const el = fadeWrapRef.current;
     if (!el) return;
     el.classList.remove('canvas-fade-in-up');
     void el.offsetWidth;
     el.classList.add('canvas-fade-in-up');
-  }, [activeTab, format, colorTheme, customTheme]);
+  }, [loaderDone, activeTab, format, colorTheme, customTheme]);
 
   // Pre-render a blurred linear-gradient ellipse via SVG feGaussianBlur (works
   // on every browser, no canvas ctx.filter dependency). Sprite size matches the
@@ -973,10 +1099,15 @@ export default function App() {
 
   const drawBlurredGradientEllipse = (ctx, mainW, mainH, cx, cy, rx, ry, gradStart, gradEnd, alpha, gradMid) => {
     const fmt = stateRef.current.format;
+    const fx = fxRef.current;
+    const ampRx = rx * fx.waveAmp;
+    const ampRy = ry * fx.waveAmp;
+    const fxAlpha = alpha;
+    const fxCx = cx, fxCy = cy;
     const sprite = getBlobSprite(gradStart, gradEnd, fmt, gradMid);
     if (sprite.ready) {
-      ctx.globalAlpha = alpha;
-      ctx.drawImage(sprite.canvas, cx - rx, cy - ry, rx * 2, ry * 2);
+      ctx.globalAlpha = fxAlpha;
+      ctx.drawImage(sprite.canvas, fxCx - ampRx, fxCy - ampRy, ampRx * 2, ampRy * 2);
       ctx.globalAlpha = 1;
       return;
     }
@@ -990,15 +1121,15 @@ export default function App() {
 
     offCtx.clearRect(0, 0, canvas.width, canvas.height);
     offCtx.filter = `blur(${170 * s}px)`;
-    const gradient = offCtx.createLinearGradient((cx - rx) * s, cy * s, (cx + rx) * s, cy * s);
+    const gradient = offCtx.createLinearGradient((fxCx - ampRx) * s, fxCy * s, (fxCx + ampRx) * s, fxCy * s);
     gradient.addColorStop(0.1529, gradStart);
     gradient.addColorStop(0.8046, gradEnd);
     offCtx.fillStyle = gradient;
     offCtx.beginPath();
-    offCtx.ellipse(cx * s, cy * s, rx * s, ry * s, 0, 0, Math.PI * 2);
+    offCtx.ellipse(fxCx * s, fxCy * s, ampRx * s, ampRy * s, 0, 0, Math.PI * 2);
     offCtx.fill();
     offCtx.filter = 'none';
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = fxAlpha;
     ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, mainW, mainH);
     ctx.globalAlpha = 1;
   };
@@ -1083,7 +1214,7 @@ export default function App() {
       // --- DASHED BORDER BETWEEN COLUMNS ---
       if (state.showDashed !== false && i < numCols - 1) {
         ctx.save();
-        ctx.globalAlpha = pColFade * 0.55;
+        ctx.globalAlpha = pColFade * 0.55 * fxRef.current.dashedIntensity;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
@@ -1292,7 +1423,7 @@ export default function App() {
       // Dashed border along the right boundary curve
       if (state.showDashed !== false && i < numCols - 1) {
         ctx.save();
-        ctx.globalAlpha = pColFade * 0.55;
+        ctx.globalAlpha = pColFade * 0.55 * fxRef.current.dashedIntensity;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
@@ -1431,7 +1562,7 @@ export default function App() {
       // — that would draw a degenerate dot at the corner).
       if (state.showDashed !== false && i > 0 && i <= visibleRings) {
         ctx.save();
-        ctx.globalAlpha = pColFade * 0.55;
+        ctx.globalAlpha = pColFade * 0.55 * fxRef.current.dashedIntensity;
         ctx.setLineDash([8, 15]);
         ctx.lineWidth = 2.0;
 
@@ -1779,10 +1910,29 @@ export default function App() {
 
       const state = stateRef.current;
       if (state.isAnimated) {
+        const opts = animOptsRef.current;
+        const cycle = opts.loopMs || LOOP_MS;
+        const effDt = dt * opts.speed;
         const prevAnim = timeStateRef.current.animatedTime;
-        const nextAnim = (prevAnim + dt) % LOOP_MS;
-        // Wrap detected — invalidate snapshot so we capture a fresh t=0 frame
-        if (nextAnim < prevAnim) loopFrame0Ref.current = null;
+        let nextAnim;
+        if (opts.playMode === 'pingpong') {
+          let v = prevAnim + opts.dir * effDt;
+          if (v >= cycle) { v = cycle - (v - cycle); opts.dir = -1; loopFrame0Ref.current = null; }
+          else if (v <= 0) { v = -v; opts.dir = 1; loopFrame0Ref.current = null; }
+          nextAnim = v;
+        } else if (opts.playMode === 'once') {
+          const raw = prevAnim + effDt;
+          if (raw >= cycle) {
+            nextAnim = cycle - 1;
+            setIsAnimated(false);
+          } else {
+            nextAnim = raw;
+          }
+        } else {
+          // loop
+          nextAnim = (prevAnim + effDt) % cycle;
+          if (nextAnim < prevAnim) loopFrame0Ref.current = null;
+        }
         timeStateRef.current.animatedTime = nextAnim;
       }
 
@@ -1800,8 +1950,16 @@ export default function App() {
 
       ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
       ctx.clearRect(0, 0, logicalW, logicalH);
-      // Mutate ref in place — avoids a per-frame object spread alloc
-      stateRef.current.animatedTime = timeStateRef.current.animatedTime;
+      // Mutate ref in place — avoids a per-frame object spread alloc.
+      // Apply easing remap to the time consumed by the scene (raw cycle position kept in timeStateRef).
+      {
+        const rawT = timeStateRef.current.animatedTime;
+        const easingMode = animOptsRef.current.easing;
+        const cycle = animOptsRef.current.loopMs || LOOP_MS;
+        stateRef.current.animatedTime = easingMode === 'linear'
+          ? rawT
+          : applyEasing(easingMode, rawT / cycle) * cycle;
+      }
       drawScene(ctx, logicalW, logicalH, time);
 
       // Loop wrap crossfade — blend last 500ms of loop toward stored t=0 frame
@@ -1817,8 +1975,10 @@ export default function App() {
           loopFrame0Ref.current = snap;
         }
         const FADE = 800;
-        if (loopFrame0Ref.current && at > LOOP_MS - FADE) {
-          const k = (at - (LOOP_MS - FADE)) / FADE;
+        const cycle = animOptsRef.current.loopMs || LOOP_MS;
+        // Only crossfade when wrapping (loop / pingpong); once-mode has no wrap so skip the blend.
+        if (animOptsRef.current.playMode !== 'once' && loopFrame0Ref.current && at > cycle - FADE) {
+          const k = (at - (cycle - FADE)) / FADE;
           const eased = k * k * (3 - 2 * k); // smoothstep
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2507,7 +2667,7 @@ export default function App() {
             color: ui.textPrimary,
             opacity: loaderDone ? 1 : 0,
             pointerEvents: loaderDone ? 'auto' : 'none',
-            transition: 'opacity 700ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease',
+            transition: 'opacity 300ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease',
             '--sec-bg': ui.sectionBg,
             '--text-primary': ui.textPrimary,
             '--text-muted': ui.textMuted,
@@ -2525,20 +2685,6 @@ export default function App() {
           <header className="relative flex items-center justify-between px-6 pt-4 pb-0 flex-shrink-0">
             <img src={isLight ? '/glowylight.png' : '/glowydark.png'} alt="Glowy" className="h-[22px] w-auto object-contain" />
             <div className="flex items-center gap-3">
-              <Tooltip label={isAnimated ? 'Pause (Space)' : 'Play (Space)'} side="bottom">
-                <button
-                  onClick={() => { playSwitch(); setIsAnimated((v) => !v); }}
-                  aria-label={isAnimated ? 'Pause animation' : 'Play animation'}
-                  aria-pressed={!isAnimated}
-                  className="flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-200"
-                  style={{ backgroundColor: ui.tabInactive, color: ui.textPrimary }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
-                >
-                  {isAnimated ? <Pause className="w-4 h-4" weight="fill" /> : <Play className="w-4 h-4" weight="fill" />}
-                </button>
-              </Tooltip>
-              <div className="h-5 w-px" style={{ backgroundColor: ui.border }} />
               <div
                 role="tablist"
                 aria-label="UI theme"
@@ -2749,10 +2895,46 @@ export default function App() {
               <div className="flex flex-col flex-1 min-h-0">
 
                 {/* PANEL TITLE — matches the active tab */}
-                <div className="px-4 pt-4 pb-2">
+                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
                   <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
                     {TABS.find((t) => t.id === activeTab)?.label}
                   </h2>
+                  {(() => {
+                    const dirty = format !== '9:16' || direction !== 'left' || dotSize !== 1.8 || dotSpacing !== 28 || gradientPos !== 'bottom' || colorTheme !== 'neon' || customTheme !== null || shapeCount !== 9 || showDashed !== true || showNoise !== true || waveAmp !== 1 || dashedIntensity !== 1 || uploadedImageSrc !== null || imageScale !== 1.0;
+                    return (
+                  <Tooltip label="Reset" side="left">
+                    <button
+                      onClick={() => {
+                        if (!dirty) return;
+                        playSwitch();
+                        setFormat('9:16');
+                        setDirection('left');
+                        setDotSize(1.8);
+                        setDotSpacing(28);
+                        setGradientPos('bottom');
+                        setColorTheme('neon');
+                        setCustomTheme(null);
+                        setShapeCount(9);
+                        setShowDashed(true);
+                        setShowNoise(true);
+                        setWaveAmp(1);
+                        setDashedIntensity(1);
+                        setUploadedImageSrc(null);
+                        setUploadedImageObj(null);
+                        setImageScale(1.0);
+                      }}
+                      aria-label="Reset"
+                      tabIndex={dirty ? 0 : -1}
+                      className="flex items-center justify-center w-6 h-6 rounded-full transition-colors duration-200"
+                      style={{ backgroundColor: 'transparent', color: ui.textSubtle, visibility: dirty ? 'visible' : 'hidden', pointerEvents: dirty ? 'auto' : 'none' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; e.currentTarget.style.color = ui.textPrimary; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = ui.textSubtle; }}
+                    >
+                      <ArrowCounterClockwise className="w-3.5 h-3.5" weight="regular" />
+                    </button>
+                  </Tooltip>
+                    );
+                  })()}
                 </div>
 
                 {/* CONTROLS — height auto-fits content, scrolls only when overflowing the viewport */}
@@ -2784,7 +2966,7 @@ export default function App() {
                                 style={{ ...shapeStyle, backgroundColor: 'currentColor' }}
                               />
                             </div>
-                            <span className="w-full text-center text-[10px] font-normal leading-none opacity-70 tabular-nums">{label}</span>
+                            <span className="w-full text-center text-[10px] font-normal leading-none tabular-nums">{label}</span>
                           </button>
                         );
                       })}
@@ -2883,12 +3065,35 @@ export default function App() {
                     </div>
                   )}
 
+                  {/* MOTION FX (Spectrum / Waves / Pulse) — wave shape + breathing + jitter + hue */}
+                  {activeTab !== 'neonPattern' && (
+                    <>
+                      <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
+                        <Slider
+                          label="Wave Amplitude"
+                          min={0} max={2} step={0.05}
+                          value={waveAmp}
+                          onChange={setWaveAmp}
+                          formatValue={(v) => v.toFixed(2) + 'x'}
+                        />
+                        <div style={{ height: 8 }}></div>
+                        <Slider
+                          label="Dashed Intensity"
+                          min={0} max={2} step={0.05}
+                          value={dashedIntensity}
+                          onChange={setDashedIntensity}
+                          formatValue={(v) => v.toFixed(2) + 'x'}
+                        />
+                      </div>
+                    </>
+                  )}
+
                   {/* ANIMATION TOGGLE */}
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                     <Switch
                       label="Animate Effect"
                       checked={isAnimated}
-                      onChange={setIsAnimated}
+                      onChange={(on) => { if (on) restartAnim(); else setIsAnimated(false); }}
                     />
                   </div>
 
@@ -2920,11 +3125,11 @@ export default function App() {
             {/* CANVAS PREVIEW — canvas itself is centred (label is absolutely
               positioned above it so it doesn't shift the centre point) */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative pointer-events-auto">
-                <span className="absolute -top-7 left-1 text-[13px] font-normal text-[#888] select-none">
+              <div className="relative pointer-events-auto flex flex-col items-stretch">
+                <span className="text-[13px] font-normal text-[#888] select-none" style={{ marginBottom: 8, marginLeft: 4 }}>
                   {FORMATS[format].label}
                 </span>
-                <div ref={fadeWrapRef} style={{ display: 'inline-block' }}>
+                <div ref={fadeWrapRef} style={{ display: 'block' }}>
                   <div
                     ref={containerRef}
                     onMouseMove={handleMouseMove}
@@ -2934,8 +3139,9 @@ export default function App() {
                       // Explicit width/height via min() — Firefox does not size
                       // an inline-block child from `aspect-ratio + max-*` alone,
                       // so the canvas collapsed in 16:9. min() works everywhere.
-                      width: `min(calc(100vw - 160px), calc((100vh - 140px) * ${FORMATS[format].width} / ${FORMATS[format].height}))`,
-                      height: `min(calc(100vh - 140px), calc((100vw - 160px) * ${FORMATS[format].height} / ${FORMATS[format].width}))`,
+                      // Reserve ≈220px of vertical chrome: header + label + transport bar + paddings.
+                      width: `min(calc(100vw - 160px), calc((100vh - 220px) * ${FORMATS[format].width} / ${FORMATS[format].height}))`,
+                      height: `min(calc(100vh - 220px), calc((100vw - 160px) * ${FORMATS[format].height} / ${FORMATS[format].width}))`,
                       aspectRatio: `${FORMATS[format].width} / ${FORMATS[format].height}`,
                       transformStyle: 'preserve-3d',
                       willChange: 'transform',
@@ -2948,10 +3154,103 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* CANVAS TRANSPORT — independent of fadeWrap so theme/format changes don't replay its enter animation */}
+                <div
+                  className="flex flex-col gap-2"
+                  style={{
+                    marginTop: 12,
+                    padding: '10px 14px 12px',
+                    borderRadius: 16,
+                    backgroundColor: ui.sectionBg,
+                    color: ui.textPrimary,
+                    position: 'relative',
+                  }}
+                >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <Tooltip label={isAnimated ? 'Pause (Space)' : 'Play (Space)'} side="top">
+                          <button
+                            onClick={() => {
+                              playSwitch();
+                              if (isAnimated) {
+                                setIsAnimated(false);
+                              } else {
+                                const cycle = animOptsRef.current.loopMs || LOOP_MS;
+                                if (animOptsRef.current.playMode === 'once' && timeStateRef.current.animatedTime >= cycle - 2) {
+                                  restartAnim();
+                                } else {
+                                  setIsAnimated(true);
+                                }
+                              }
+                            }}
+                            aria-label={isAnimated ? 'Pause' : 'Play'}
+                            className="flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-200"
+                            style={{ backgroundColor: 'transparent', color: ui.textPrimary }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            {isAnimated ? <Pause className="w-4 h-4" weight="fill" /> : <Play className="w-4 h-4" weight="fill" />}
+                          </button>
+                        </Tooltip>
+                        <Tooltip label="Restart" side="top">
+                          <button
+                            onClick={() => { playSwitch(); restartAnim(); }}
+                            aria-label="Restart"
+                            className="flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-200"
+                            style={{ backgroundColor: 'transparent', color: ui.textPrimary }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <SkipBack className="w-4 h-4" weight="fill" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-mono tabular-nums" style={{ color: ui.textSubtle }}>
+                          {(playheadMs / 1000).toFixed(1)}s / {(loopDurationMs / 1000).toFixed(1)}s
+                        </span>
+                        <Tooltip label={playMode === 'once' ? 'Loop off' : 'Loop on'} side="top">
+                          <button
+                            onClick={() => {
+                              playSwitch();
+                              setPlayMode((m) => (m === 'once' ? 'loop' : 'once'));
+                            }}
+                            aria-label="Toggle loop"
+                            aria-pressed={playMode !== 'once'}
+                            className="flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-200"
+                            style={{
+                              backgroundColor: playMode !== 'once' ? ui.tabHover : 'transparent',
+                              color: playMode !== 'once' ? ui.textPrimary : ui.textSubtle,
+                            }}
+                            onMouseEnter={(e) => { if (playMode === 'once') e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                            onMouseLeave={(e) => { if (playMode === 'once') e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <Repeat className="w-4 h-4" weight="regular" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(1, loopDurationMs - 1)}
+                      step={1}
+                      value={Math.min(Math.round(playheadMs), loopDurationMs - 1)}
+                      onChange={(e) => seekTo(Number(e.target.value))}
+                      aria-label="Animation timeline"
+                      className="w-full h-[2px] rounded-full appearance-none cursor-pointer focus:outline-none"
+                      style={{
+                        background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${(Math.min(playheadMs, loopDurationMs - 1) / Math.max(1, loopDurationMs - 1)) * 100}%, var(--slider-track) ${(Math.min(playheadMs, loopDurationMs - 1) / Math.max(1, loopDurationMs - 1)) * 100}%, var(--slider-track) 100%)`,
+                      }}
+                    />
+
+                </div>
+
                 {/* THEME SELECTOR — vertical on right of canvas. Active = gray
                   rounded-square container holding both overlapping dots and the
                   current tab label; inactive = dots + theme label only. */}
-                <div className="absolute left-full top-0 flex flex-col" style={{ gap: 13, marginLeft: 13 }}>
+                <div className="absolute left-full flex flex-col" style={{ gap: 13, marginLeft: 13, top: 26 }}>
                   {Object.entries(THEMES).map(([key, t]) => {
                     const isActive = colorTheme === key && !customTheme;
                     const label = t.label;
@@ -3022,6 +3321,173 @@ export default function App() {
                       <span className={`text-[12px] font-normal leading-none transition-colors duration-300 ${customTheme ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>Random</span>
                     </div>
                   </button>
+                </div>
+              </div>
+            </div>
+
+            {/* FLOATING ANIMATION RAIL (right) */}
+            <div ref={animRailRef} className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
+              {(() => {
+                const isActive = animPanelOpen;
+                const btn = (
+                  <button
+                    onClick={() => { playHover(); setAnimPanelOpen((v) => !v); }}
+                    aria-label="Animation"
+                    aria-pressed={isActive}
+                    className="w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center"
+                    style={{
+                      backgroundColor: isActive ? (isLight ? '#161616' : '#FFFFFF') : ui.tabInactive,
+                      color: isActive ? (isLight ? '#FFFFFF' : '#000000') : ui.textPrimary,
+                    }}
+                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                    onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = ui.tabInactive; }}
+                  >
+                    <Lightning className="w-5 h-5" weight="fill" />
+                  </button>
+                );
+                return animPanelOpen ? <div>{btn}</div> : <Tooltip label="Animation" side="left">{btn}</Tooltip>;
+              })()}
+            </div>
+
+            {/* FLOATING ANIMATION PANEL (right) */}
+            <div
+              ref={animPanelRef}
+              className={`panel-themed absolute right-[88px] top-0 bottom-0 my-auto w-[280px] flex flex-col rounded-[16px] overflow-hidden z-10 transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${animPanelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+              style={{
+                backgroundColor: ui.panelBg,
+                color: ui.textPrimary,
+                maxHeight: 'calc(100% - 16px)',
+                height: 'fit-content',
+                transform: `translateX(${animPanelOpen ? '0px' : '16px'})`,
+                '--sec-bg': ui.sectionBg,
+                '--text-primary': ui.textPrimary,
+                '--text-muted': ui.textMuted,
+                '--text-subtle': ui.textSubtle,
+                '--tab-hover': ui.tabHover,
+                '--tab-active': ui.tabActive,
+                '--tab-active-text': ui.tabActiveText,
+                '--accent': ui.accent,
+                '--accent-inverse': ui.accentInverse,
+                '--slider-track': ui.sliderTrack,
+              }}
+            >
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="px-4 pt-4 pb-2">
+                  <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
+                    Animation
+                  </h2>
+                </div>
+
+                <div className="panel-scroll flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2 flex-1 min-h-0">
+
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3 flex items-center justify-between">
+                    <span className="text-[11px] font-normal text-white">Playback</span>
+                    <div className="flex items-center gap-1">
+                    <Tooltip label={playMode === 'once' ? 'Loop off' : 'Loop on'} side="bottom">
+                      <button
+                        onClick={() => {
+                          playSwitch();
+                          setPlayMode((m) => (m === 'once' ? 'loop' : 'once'));
+                        }}
+                        aria-label="Toggle loop"
+                        aria-pressed={playMode !== 'once'}
+                        className="flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-200"
+                        style={{
+                          backgroundColor: playMode !== 'once' ? ui.tabHover : 'transparent',
+                          color: playMode !== 'once' ? ui.textPrimary : ui.textSubtle,
+                        }}
+                        onMouseEnter={(e) => { if (playMode === 'once') e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                        onMouseLeave={(e) => { if (playMode === 'once') e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      >
+                        <Repeat className="w-4 h-4" weight="regular" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label={isAnimated ? 'Pause (Space)' : 'Play (Space)'} side="bottom">
+                      <button
+                        onClick={() => {
+                          playSwitch();
+                          if (isAnimated) {
+                            setIsAnimated(false);
+                          } else {
+                            const cycle = animOptsRef.current.loopMs || LOOP_MS;
+                            if (animOptsRef.current.playMode === 'once' && timeStateRef.current.animatedTime >= cycle - 2) {
+                              restartAnim();
+                            } else {
+                              setIsAnimated(true);
+                            }
+                          }
+                        }}
+                        aria-label={isAnimated ? 'Pause' : 'Play'}
+                        className="flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-200"
+                        style={{ backgroundColor: 'transparent', color: ui.textPrimary }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      >
+                        {isAnimated ? <Pause className="w-4 h-4" weight="fill" /> : <Play className="w-4 h-4" weight="fill" />}
+                      </button>
+                    </Tooltip>
+                    </div>
+                  </div>
+
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
+                    <Slider
+                      label="Speed"
+                      min={0.5} max={2} step={0.1}
+                      value={animSpeed}
+                      onChange={setAnimSpeed}
+                      formatValue={(v) => v.toFixed(1) + 'x'}
+                    />
+                  </div>
+
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
+                    <Slider
+                      label="Duration"
+                      min={2000} max={20000} step={500}
+                      value={loopDurationMs}
+                      onChange={(v) => {
+                        setLoopDurationMs(v);
+                        if (timeStateRef.current.animatedTime > v) {
+                          timeStateRef.current.animatedTime = v - 1;
+                          loopFrame0Ref.current = null;
+                          requestPreviewRedrawRef.current();
+                        }
+                      }}
+                      formatValue={(v) => (v / 1000).toFixed(1) + 's'}
+                    />
+                  </div>
+
+                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
+                    <label className="text-[11px] font-normal text-white mb-2 block">Easing</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'linear', label: 'Linear' },
+                        { id: 'ease', label: 'Ease' },
+                        { id: 'sine', label: 'Sine' },
+                        { id: 'cubic', label: 'Cubic' },
+                        { id: 'quint', label: 'Quint' },
+                        { id: 'expo', label: 'Expo' },
+                        { id: 'back', label: 'Back' },
+                        { id: 'bounce', label: 'Bounce' },
+                        { id: 'elastic', label: 'Elastic' },
+                      ].map(({ id, label }) => {
+                        const active = easing === id;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => { playSwitch(); setEasing(id); }}
+                            className={`aspect-square rounded-[16px] flex flex-col items-center justify-center gap-2 transition-colors duration-200 ${active
+                              ? 'bg-[var(--tab-active)] text-[var(--tab-active-text)]'
+                              : 'bg-transparent text-[var(--text-subtle)] hover:bg-[var(--tab-hover)] hover:text-[var(--text-muted)]'
+                              }`}
+                          >
+                            <EasingIcon mode={id} />
+                            <span className="w-full text-center text-[10px] font-normal leading-none">{label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </div>

@@ -21,7 +21,7 @@ const light = {
   border: '#D4D4D8',
   accent: palette.black,
   accentInverse: palette.white,
-  sliderTrack: '#D9D9D9',
+  sliderTrack: '#CECECE',
   modalBg: palette.white,
 };
 
@@ -39,7 +39,7 @@ const dark = {
   border: '#3A3A3A',
   accent: palette.white,
   accentInverse: palette.black,
-  sliderTrack: '#2A2A2A',
+  sliderTrack: '#3A3A3A',
   modalBg: '#181818',
 };
 
