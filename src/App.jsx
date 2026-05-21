@@ -702,7 +702,6 @@ export default function App() {
     animOptsRef.current.playMode = playMode;
     animOptsRef.current.loopMs = loopDurationMs;
   }, [animSpeed, easing, playMode, loopDurationMs]);
-  const [videoDuration, setVideoDuration] = useState(15); // seconds — 5 | 10 | 15 | 30
   const [isRecording, setIsRecording] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [svgExporting, setSvgExporting] = useState(false);
@@ -831,6 +830,7 @@ export default function App() {
     document.addEventListener('mousedown', onMouseDown);
     return () => document.removeEventListener('mousedown', onMouseDown);
   }, [animPanelOpen]);
+
   const [colorTheme, setColorTheme] = useState('neon');
   const [uploadedImageSrc, setUploadedImageSrc] = useState(null);
   const [uploadedImageObj, setUploadedImageObj] = useState(null);
@@ -2542,7 +2542,7 @@ export default function App() {
   };
 
   // --- EXPORT VIDEO — orchestrator picks the best path per browser ---
-  const handleExportVideo = async (targetShort = 1080, durationSeconds = videoDuration) => {
+  const handleExportVideo = async (targetShort = 1080, durationSeconds = Math.round(loopDurationMs / 1000)) => {
     if (isRecording) return;
     setIsRecording(true);
     if (!stateRef.current.isAnimated) setIsAnimated(true);
@@ -2794,25 +2794,7 @@ export default function App() {
                           <Divider />
                           <div className="px-[22px] pt-1.5 pb-1 flex items-center justify-between text-[10px] uppercase tracking-wider" style={sectionStyle}>
                             <span>Video Format</span>
-                            <span className="normal-case tracking-normal">{IS_FIREFOX ? `WebM · VP9 · 30 fps · ${videoDuration} s` : `MP4 · H.264 · 30 fps · ${videoDuration} s`}</span>
-                          </div>
-                          <div className="px-3 pb-2">
-                            <div className="flex items-center p-0.5 rounded-full" style={{ backgroundColor: ui.tabInactive }}>
-                              {[3, 5, 8, 15].map((d) => {
-                                const active = videoDuration === d;
-                                return (
-                                  <button
-                                    key={d}
-                                    onClick={() => { playSwitch(); setVideoDuration(d); }}
-                                    className="flex-1 h-6 rounded-full text-[11px] transition-colors"
-                                    style={{
-                                      backgroundColor: active ? (isLight ? '#161616' : '#FFFFFF') : 'transparent',
-                                      color: active ? (isLight ? '#FFFFFF' : '#000000') : ui.textPrimary,
-                                    }}
-                                  >{d}s</button>
-                                );
-                              })}
-                            </div>
+                            <span className="normal-case tracking-normal">{IS_FIREFOX ? `WebM · VP9 · 30 fps · ${Math.round(loopDurationMs / 1000)} s` : `MP4 · H.264 · 30 fps · ${Math.round(loopDurationMs / 1000)} s`}</span>
                           </div>
                           {(() => {
                             const base = FORMATS[format];
@@ -2895,8 +2877,8 @@ export default function App() {
               <div className="flex flex-col flex-1 min-h-0">
 
                 {/* PANEL TITLE — matches the active tab */}
-                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-                  <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
+                <div className="px-4 pt-2 pb-1 flex items-center justify-between">
+                  <h2 className="text-[14px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
                     {TABS.find((t) => t.id === activeTab)?.label}
                   </h2>
                   {(() => {
@@ -2924,12 +2906,12 @@ export default function App() {
                       }}
                       aria-label="Reset"
                       tabIndex={dirty ? 0 : -1}
-                      className="flex items-center justify-center w-6 h-6 rounded-full transition-colors duration-200"
+                      className="flex items-center justify-center w-8 h-8 rounded-full transition-colors duration-200"
                       style={{ backgroundColor: 'transparent', color: ui.textSubtle, visibility: dirty ? 'visible' : 'hidden', pointerEvents: dirty ? 'auto' : 'none' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = ui.tabHover; e.currentTarget.style.color = ui.textPrimary; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = ui.textSubtle; }}
                     >
-                      <ArrowCounterClockwise className="w-3.5 h-3.5" weight="regular" />
+                      <ArrowCounterClockwise className="w-4 h-4" weight="regular" />
                     </button>
                     );
                     return dirty ? <Tooltip label="Reset" side="left">{btn}</Tooltip> : btn;
@@ -3049,7 +3031,7 @@ export default function App() {
                     </>
                   )}
 
-                  {/* SHAPE COUNT (Spectrum / Waves / Pulse) */}
+                  {/* SHAPE + MOTION FX (Spectrum / Waves / Pulse) */}
                   {activeTab !== 'neonPattern' && (
                     <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                       <Slider
@@ -3061,30 +3043,23 @@ export default function App() {
                         onChange={setShapeCount}
                         formatValue={(v) => v}
                       />
+                      <div style={{ height: 8 }}></div>
+                      <Slider
+                        label="Wave Amplitude"
+                        min={0} max={2} step={0.05}
+                        value={waveAmp}
+                        onChange={setWaveAmp}
+                        formatValue={(v) => v.toFixed(2) + 'x'}
+                      />
+                      <div style={{ height: 8 }}></div>
+                      <Slider
+                        label="Dashed Intensity"
+                        min={0} max={2} step={0.05}
+                        value={dashedIntensity}
+                        onChange={setDashedIntensity}
+                        formatValue={(v) => v.toFixed(2) + 'x'}
+                      />
                     </div>
-                  )}
-
-                  {/* MOTION FX (Spectrum / Waves / Pulse) — wave shape + breathing + jitter + hue */}
-                  {activeTab !== 'neonPattern' && (
-                    <>
-                      <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
-                        <Slider
-                          label="Wave Amplitude"
-                          min={0} max={2} step={0.05}
-                          value={waveAmp}
-                          onChange={setWaveAmp}
-                          formatValue={(v) => v.toFixed(2) + 'x'}
-                        />
-                        <div style={{ height: 8 }}></div>
-                        <Slider
-                          label="Dashed Intensity"
-                          min={0} max={2} step={0.05}
-                          value={dashedIntensity}
-                          onChange={setDashedIntensity}
-                          formatValue={(v) => v.toFixed(2) + 'x'}
-                        />
-                      </div>
-                    </>
                   )}
 
                   {/* ANIMATION TOGGLE */}
@@ -3372,8 +3347,8 @@ export default function App() {
               }}
             >
               <div className="flex flex-col flex-1 min-h-0">
-                <div className="px-4 pt-4 pb-2">
-                  <h2 className="text-[12px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
+                <div className="px-4 pt-2 pb-1 flex items-center" style={{ minHeight: 44 }}>
+                  <h2 className="text-[14px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
                     Animation
                   </h2>
                 </div>
