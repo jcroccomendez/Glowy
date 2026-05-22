@@ -64,8 +64,8 @@ export const spacing = {
 };
 
 export const typography = {
-  family: "'Inter', sans-serif",
-  weight: { regular: 400 },
+  family: "'Geist', sans-serif",
+  weight: { regular: 500 },
   size: {
     xs: 10,
     sm: 11,

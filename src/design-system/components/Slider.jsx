@@ -22,7 +22,7 @@ export const Slider = ({ label, value, min, max, step, onChange, formatValue = (
   return (
     <div className="flex flex-col gap-1 mb-1 last:mb-0">
       <div className="flex justify-between items-center" style={{ marginBottom: 6 }}>
-        <label className="text-[11px] font-normal text-white">{label}</label>
+        <label className="text-[11px] font-medium text-white">{label}</label>
         <span className="text-[11px] text-[#666] font-mono tabular-nums">{formatValue(value)}</span>
       </div>
       <input

@@ -272,7 +272,7 @@ const NeonplaceLogo = ({ className }) => (
       <path fillRule="evenodd" clipRule="evenodd" d="M19.089 0v9.113l-6.356 6.357-6.367-6.367L0 15.47V6.357L6.356 0l6.367 6.368L19.089 0Z" fill="#24F187" />
       <path fillRule="evenodd" clipRule="evenodd" d="M6.367 15.47H4.71V14.3l1.657-1.657 1.656 1.657v1.17H6.367Z" fill="#fff" />
     </svg>
-    <span className="text-white text-[14px] font-normal tracking-tight leading-none">neonplace</span>
+    <span className="text-white text-[14px] font-medium leading-none">neonplace</span>
   </div>
 );
 
@@ -650,7 +650,7 @@ const Loader = ({ onDone, onFadeStart, bgColor = APP_BG }) => {
         <div
           className="relative text-white mt-3"
           style={{
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: "'Geist', sans-serif",
             fontSize: '30px',
             fontWeight: 300,
             lineHeight: '120%',
@@ -2593,8 +2593,8 @@ export default function App() {
     <>
       <style dangerouslySetInnerHTML={{
         __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; margin: 0; background: ${ui.appBg}; transition: background-color 300ms ease; }
+        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Geist', sans-serif; font-weight: 500; margin: 0; background: ${ui.appBg}; transition: background-color 300ms ease; }
         @keyframes fadeInLeft {
           from { opacity: 0; transform: translateX(-16px); }
           to { opacity: 1; transform: translateX(0); }
@@ -2722,7 +2722,7 @@ export default function App() {
                 <button
                   onClick={() => { playSwitch(); if (!isRecording && !svgExporting) setExportMenuOpen((v) => !v); }}
                   disabled={isRecording || svgExporting}
-                  className={`relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed ${isLight ? 'bg-[#161616] hover:bg-[#161616]/90' : 'bg-white hover:bg-white/90'}`}
+                  className={`relative overflow-hidden flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[12px] disabled:cursor-not-allowed ${isLight ? 'bg-[#161616] hover:bg-[#161616]/90' : 'bg-white hover:bg-white/90'}`}
                   style={{ color: isLight ? '#FFFFFF' : '#000000' }}
                 >
                   {(isRecording || svgExporting) && (
@@ -2771,7 +2771,7 @@ export default function App() {
                       );
                       const Divider = () => <div className="my-1.5 h-px" style={{ backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }} />;
                       const Header = ({ children }) => (
-                        <div className="px-[22px] pt-1.5 pb-1 text-[10px] uppercase tracking-wider" style={sectionStyle}>{children}</div>
+                        <div className="px-[22px] pt-1.5 pb-1 text-[10px] uppercase" style={sectionStyle}>{children}</div>
                       );
                       const run = (fn) => { playSwitch(); setExportMenuOpen(false); fn(); };
                       return (
@@ -2792,9 +2792,9 @@ export default function App() {
                             );
                           })()}
                           <Divider />
-                          <div className="px-[22px] pt-1.5 pb-1 flex items-center justify-between text-[10px] uppercase tracking-wider" style={sectionStyle}>
+                          <div className="px-[22px] pt-1.5 pb-1 flex items-center justify-between text-[10px] uppercase" style={sectionStyle}>
                             <span>Video Format</span>
-                            <span className="normal-case tracking-normal">{IS_FIREFOX ? `WebM · VP9 · 30 fps · ${Math.round(loopDurationMs / 1000)} s` : `MP4 · H.264 · 30 fps · ${Math.round(loopDurationMs / 1000)} s`}</span>
+                            <span className="normal-case">{IS_FIREFOX ? `WebM · VP9 · 30 fps · ${Math.round(loopDurationMs / 1000)} s` : `MP4 · H.264 · 30 fps · ${Math.round(loopDurationMs / 1000)} s`}</span>
                           </div>
                           {(() => {
                             const base = FORMATS[format];
@@ -2878,7 +2878,7 @@ export default function App() {
 
                 {/* PANEL TITLE — matches the active tab */}
                 <div className="px-4 pt-2 pb-1 flex items-center justify-between">
-                  <h2 className="text-[14px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
+                  <h2 className="text-[14px] font-medium" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
                     {TABS.find((t) => t.id === activeTab)?.label}
                   </h2>
                   {(() => {
@@ -2923,7 +2923,7 @@ export default function App() {
 
                   {/* PRESETS SECTION */}
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
-                    <label className="text-[11px] font-normal text-white mb-2 block">Presets</label>
+                    <label className="text-[11px] font-medium text-white mb-2 block">Presets</label>
                     <div className="flex justify-between">
                       {Object.entries(FORMATS).map(([key, { label }]) => {
                         const isActive = format === key;
@@ -2947,7 +2947,7 @@ export default function App() {
                                 style={{ ...shapeStyle, backgroundColor: 'currentColor' }}
                               />
                             </div>
-                            <span className="w-full text-center text-[10px] font-normal leading-none tabular-nums">{label}</span>
+                            <span className="w-full text-center text-[10px] font-medium leading-none tabular-nums">{label}</span>
                           </button>
                         );
                       })}
@@ -2956,7 +2956,7 @@ export default function App() {
 
                   {/* COLOR THEME SECTION */}
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
-                    <label className="text-[11px] font-normal text-white mb-2 block">Color Theme</label>
+                    <label className="text-[11px] font-medium text-white mb-2 block">Color Theme</label>
                     <div className="flex justify-between">
                       {Object.entries(THEMES).map(([key, t]) => {
                         const isActive = colorTheme === key;
@@ -2983,7 +2983,7 @@ export default function App() {
                                 />
                               ))}
                             </div>
-                            <span className={`text-[11px] font-normal text-center leading-none ${isActive ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)]'
+                            <span className={`text-[11px] font-medium text-center leading-none ${isActive ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)]'
                               }`}>{t.label}</span>
                           </button>
                         );
@@ -3100,7 +3100,7 @@ export default function App() {
               positioned above it so it doesn't shift the centre point) */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="relative pointer-events-auto flex flex-col items-stretch">
-                <span className="text-[13px] font-normal text-[#888] select-none" style={{ marginBottom: 8, marginLeft: 4 }}>
+                <span className="text-[13px] font-medium text-[#888] select-none" style={{ marginBottom: 8, marginLeft: 4 }}>
                   {FORMATS[format].label}
                 </span>
                 <div ref={fadeWrapRef} style={{ display: 'block' }}>
@@ -3254,7 +3254,7 @@ export default function App() {
                       >
                         <div className="flex flex-col items-center gap-2">
                           {dots}
-                          <span className={`text-[12px] font-normal leading-none transition-colors duration-300 ${isActive ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>{label}</span>
+                          <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${isActive ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>{label}</span>
                         </div>
                       </button>
                     );
@@ -3293,7 +3293,7 @@ export default function App() {
                           />
                         ))}
                       </div>
-                      <span className={`text-[12px] font-normal leading-none transition-colors duration-300 ${customTheme ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>Random</span>
+                      <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${customTheme ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>Random</span>
                     </div>
                   </button>
                 </div>
@@ -3348,7 +3348,7 @@ export default function App() {
             >
               <div className="flex flex-col flex-1 min-h-0">
                 <div className="px-4 pt-2 pb-1 flex items-center" style={{ minHeight: 44 }}>
-                  <h2 className="text-[14px] font-normal tracking-tight" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
+                  <h2 className="text-[14px] font-medium" style={{ color: isLight ? ui.textPrimary : '#FFFFFF' }}>
                     Animation
                   </h2>
                 </div>
@@ -3356,7 +3356,7 @@ export default function App() {
                 <div className="panel-scroll flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2 flex-1 min-h-0">
 
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3 flex items-center justify-between">
-                    <span className="text-[11px] font-normal text-white">Playback</span>
+                    <span className="text-[11px] font-medium text-white">Playback</span>
                     <div className="flex items-center gap-1">
                     <Tooltip label={playMode === 'once' ? 'Loop off' : 'Loop on'} side="bottom">
                       <button
@@ -3432,7 +3432,7 @@ export default function App() {
                   </div>
 
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
-                    <label className="text-[11px] font-normal text-white mb-2 block">Easing</label>
+                    <label className="text-[11px] font-medium text-white mb-2 block">Easing</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { id: 'linear', label: 'Linear' },
@@ -3456,7 +3456,7 @@ export default function App() {
                               }`}
                           >
                             <EasingIcon mode={id} />
-                            <span className="w-full text-center text-[10px] font-normal leading-none">{label}</span>
+                            <span className="w-full text-center text-[10px] font-medium leading-none">{label}</span>
                           </button>
                         );
                       })}
@@ -3482,10 +3482,10 @@ export default function App() {
             >
               <div className="w-full max-w-[380px] text-center">
                 <img src="/favicon.png" alt="Glowy" className="h-[74px] w-auto object-contain mx-auto mb-4" />
-                <h2 className="text-[20px] font-normal tracking-tight mb-3" style={{ color: sysText }}>
+                <h2 className="text-[20px] font-medium mb-3" style={{ color: sysText }}>
                   Best on desktop
                 </h2>
-                <p className="text-[13px] font-normal leading-relaxed" style={{ color: sysSubtle }}>
+                <p className="text-[13px] font-medium leading-relaxed" style={{ color: sysSubtle }}>
                   Glowy shines on a bigger screen. Open it on desktop for the full experience.
                 </p>
               </div>
@@ -3512,10 +3512,10 @@ export default function App() {
           <div className="text-center mb-2">
             <img src="/favicon.png" alt="Glowy" className="h-[74px] w-auto object-contain mx-auto" />
           </div>
-          <h2 className="text-center text-[20px] font-normal tracking-tight mb-3" style={{ color: ui.textPrimary }}>
+          <h2 className="text-center text-[20px] font-medium mb-3" style={{ color: ui.textPrimary }}>
             Your file is ready!
           </h2>
-          <p className="text-center text-[13px] font-normal leading-relaxed mb-6" style={{ color: ui.textSubtle }}>
+          <p className="text-center text-[13px] font-medium leading-relaxed mb-6" style={{ color: ui.textSubtle }}>
             Glowy is free and built with love. If you enjoyed it, share it with your friends and fellow creators!
           </p>
 
@@ -3536,19 +3536,19 @@ export default function App() {
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ui.tabInactive; }}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                <span className="text-[13px] font-normal">{label}</span>
+                <span className="text-[13px] font-medium">{label}</span>
               </a>
             ))}
           </div>
 
           <div className="rounded-[12px] p-4 mb-5" style={{ backgroundColor: ui.sectionBg }}>
-            <p className="text-[12px] font-normal leading-relaxed" style={{ color: ui.textSubtle }}>
+            <p className="text-[12px] font-medium leading-relaxed" style={{ color: ui.textSubtle }}>
               Your share keeps Glowy alive and growing — every post helps spread the glow.
             </p>
           </div>
 
           <div className="pt-4 text-center" style={{ borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'}` }}>
-            <p className="text-[12px] font-normal" style={{ color: ui.textSubtle }}>
+            <p className="text-[12px] font-medium" style={{ color: ui.textSubtle }}>
               Designed & built by{' '}
               <a
                 href="https://x.com/javiercrocco"

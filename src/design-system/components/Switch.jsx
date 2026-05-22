@@ -18,7 +18,7 @@ export const Switch = ({ label, checked, onChange, icon }) => {
     <div className="flex items-center justify-between py-1.5">
       <div className="flex items-center gap-2">
         {icon && <span className="text-[#666]">{icon}</span>}
-        <label className="text-[12px] font-normal text-white cursor-pointer" onClick={toggle}>
+        <label className="text-[12px] font-medium text-white cursor-pointer" onClick={toggle}>
           {label}
         </label>
       </div>

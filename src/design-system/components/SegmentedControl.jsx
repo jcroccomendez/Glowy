@@ -40,7 +40,7 @@ export const SegmentedControl = ({ items, value, onChange, ariaLabel }) => (
           onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent'; }}
         >
           {icon}
-          {label && <span className="text-[12px] font-normal ml-1.5">{label}</span>}
+          {label && <span className="text-[12px] font-medium ml-1.5">{label}</span>}
         </button>
       );
     })}

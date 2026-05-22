@@ -27,7 +27,7 @@ const preview = {
       const theme = globals.theme || 'dark';
       const bg = theme === 'light' ? '#fbfbfb' : '#141414';
       return (
-        <div data-theme={theme} style={{ padding: 24, minHeight: '100vh', background: bg, fontFamily: "'Inter', sans-serif" }}>
+        <div data-theme={theme} style={{ padding: 24, minHeight: '100vh', background: bg, fontFamily: "'Geist', sans-serif" }}>
           <Story />
         </div>
       );

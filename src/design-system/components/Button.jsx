@@ -10,7 +10,7 @@
  */
 
 const baseClass =
-  'flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-normal text-[12px] disabled:cursor-not-allowed disabled:opacity-50';
+  'flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 font-medium text-[12px] disabled:cursor-not-allowed disabled:opacity-50';
 
 /** @param {ButtonProps & Record<string, any>} props */
 export const Button = ({

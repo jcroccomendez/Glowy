@@ -32,7 +32,7 @@ export const DirectionPad = ({ label, direction, onChange, disabledDirs = [] }) 
 
   return (
     <div className="flex items-center justify-between">
-      <label className="text-[11px] font-normal text-[var(--text-primary)]">{label}</label>
+      <label className="text-[11px] font-medium text-[var(--text-primary)]">{label}</label>
       <div className="relative w-24 h-14 bg-[var(--tab-active)] rounded-xl flex items-center justify-center">
         <div className="relative w-4 h-4 pointer-events-none opacity-30">
           <div className="absolute top-1/2 left-0 w-full h-px bg-[#666] -translate-y-1/2" />
