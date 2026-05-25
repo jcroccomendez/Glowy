@@ -188,3 +188,25 @@
   width: 4px;
   background: var(--slider-thumb);
 }
+
+/* Custom color picker (react-colorful) — match app's rounded panel look. */
+.custom-color-picker .react-colorful {
+  width: 100% !important;
+  height: 180px !important;
+  gap: 10px;
+}
+.custom-color-picker .react-colorful__saturation {
+  border-radius: 10px;
+  border-bottom: none;
+  flex: 1;
+}
+.custom-color-picker .react-colorful__hue {
+  height: 12px;
+  border-radius: 9999px;
+}
+.custom-color-picker .react-colorful__pointer {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+

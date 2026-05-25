@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X, CaretDown, Play, Pause, SkipBack, Repeat, Lightning, ArrowCounterClockwise } from '@phosphor-icons/react';
+import { Desktop, ArrowCircleDown, Sun, Moon, IconContext, XLogo, FacebookLogo, LinkedinLogo, X, CaretDown, Play, Pause, SkipBack, Repeat, Lightning, ArrowCounterClockwise, PaintBrush, Plus } from '@phosphor-icons/react';
 import { getTokens } from './design-system/tokens';
 import { Tooltip, Slider, Switch, DirectionPad, Modal } from './design-system/components';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import useSound from 'use-sound';
+import { HexColorPicker } from 'react-colorful';
 
 // --- CONFIGURATION AND UTILITIES ---
 const APP_BG = '#0d0d0d'; // Unified general app background
@@ -256,10 +257,10 @@ const PulseIcon = (props) => (
 );
 
 const TABS = [
-  { id: 'neonPattern', label: 'Pattern', Icon: PatternIcon },
   { id: 'spectrum', label: 'Spectrum', Icon: SpectrumIcon },
   { id: 'radial', label: 'Waves', Icon: WavesIcon },
   { id: 'glass', label: 'Pulse', Icon: PulseIcon },
+  { id: 'neonPattern', label: 'Pattern', Icon: PatternIcon },
 ];
 
 // --- INTRO LOADER ---
@@ -709,6 +710,25 @@ export default function App() {
   const [loaderDone, setLoaderDone] = useState(false);
   const [shapeCount, setShapeCount] = useState(9);
   const [customTheme, setCustomTheme] = useState(null);
+  const [customPickerOpen, setCustomPickerOpen] = useState(false);
+  const [customSlot, setCustomSlot] = useState('gradientStart');
+  const [customDraft, setCustomDraft] = useState({
+    bg: '#0B0F1A',
+    gradientStart: '#0A84FF',
+    gradientMid: '#5856D6',
+    gradientEnd: '#64D2FF',
+  });
+  const applyCustomDraft = (next) => {
+    setCustomDraft(next);
+    setCustomTheme({
+      label: 'Custom',
+      bg: next.bg,
+      gradientStart: next.gradientStart,
+      gradientMid: next.gradientMid,
+      gradientEnd: next.gradientEnd,
+      preview: [next.gradientStart, next.gradientMid, next.gradientEnd],
+    });
+  };
   const [showDashed, setShowDashed] = useState(true);
   const [showNoise, setShowNoise] = useState(true);
   const [themePref, setThemePref] = useState('system'); // 'system' | 'light' | 'dark'
@@ -727,6 +747,10 @@ export default function App() {
   const uiTheme = themePref === 'system' ? (systemDark ? 'dark' : 'light') : themePref;
   const isLight = uiTheme === 'light';
   const ui = getTokens(uiTheme);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.setAttribute('data-theme', uiTheme);
+  }, [uiTheme]);
 
   // Low-power auto-pause: prefers-reduced-motion OR battery <20% on mount
   useEffect(() => {
@@ -781,7 +805,7 @@ export default function App() {
   const [dotSize, setDotSize] = useState(1.8);
   const [dotSpacing, setDotSpacing] = useState(28);
   const [gradientPos, setGradientPos] = useState('bottom');
-  const [activeTab, setActiveTab] = useState('neonPattern'); // 'neonPattern' | 'spectrum' | 'radial'
+  const [activeTab, setActiveTab] = useState('spectrum'); // 'spectrum' | 'radial' | 'glass' | 'neonPattern'
   const [panelOpen, setPanelOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -2173,13 +2197,13 @@ export default function App() {
           </g>
         `;
 
-        if (i < numCols - 1) {
+        if (state.showDashed !== false && i < numCols - 1) {
           const borderX = (i + 1) * colWidth;
           colsHtml += `
-            <line x1="${borderX}" y1="0" x2="${borderX}" y2="${height}" 
-                  stroke="url(#borderGrad)" 
-                  stroke-width="2.0" 
-                  stroke-dasharray="8,15" 
+            <line x1="${borderX}" y1="0" x2="${borderX}" y2="${height}"
+                  stroke="url(#borderGrad)"
+                  stroke-width="2.0"
+                  stroke-dasharray="8,15"
                   opacity="0.5" />
           `;
         }
@@ -2264,7 +2288,7 @@ export default function App() {
 
         groupsCols += `<g clip-path="url(#clipW${i})"><ellipse cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" rx="${rxx.toFixed(2)}" ry="${ryy.toFixed(2)}" fill="url(#blobGrad)" filter="url(#blurFilter)" /></g>`;
 
-        if (i < numColsW - 1) {
+        if (state.showDashed !== false && i < numColsW - 1) {
           const b = boundariesW[i + 1];
           const dStr = pathFromPoints(b);
           dashedCols += `<path d="${dStr}" stroke="url(#borderGrad)" stroke-width="2" stroke-dasharray="8,15" fill="none" opacity="0.5" />`;
@@ -2306,7 +2330,7 @@ export default function App() {
         const cy = baseBlobYG + animY;
         groupsRings += `<g clip-path="url(#clipG${i})"><ellipse cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" rx="${rxx.toFixed(2)}" ry="${ryy.toFixed(2)}" fill="url(#blobGrad)" filter="url(#blurFilter)" /></g>`;
 
-        if (i > 0) {
+        if (state.showDashed !== false && i > 0) {
           dashedRings += `<circle cx="${cornerX}" cy="${cornerY}" r="${innerR.toFixed(2)}" fill="none" stroke="url(#borderGrad)" stroke-width="2" stroke-dasharray="8,15" opacity="0.5" />`;
         }
       }
@@ -2865,7 +2889,7 @@ export default function App() {
           <div className="flex-1 relative px-6 pb-6 overflow-hidden">
 
             {/* ICON RAIL — vertically centred against the viewport */}
-            <div ref={railRef} className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
+            <div ref={railRef} className="nav-rail absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
               {TABS.map(({ id, label, Icon }) => {
                 const isActive = activeTab === id;
                 const isOpen = panelOpen;
@@ -2873,7 +2897,7 @@ export default function App() {
                   <button
                     onClick={() => { playHover(); handleTabClick(id); }}
                     aria-label={label}
-                    className="w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center"
+                    className="nav-rail__btn w-12 h-12 rounded-[100px] transition-colors duration-200 flex items-center justify-center"
                     style={{
                       backgroundColor: isActive ? (isLight ? '#161616' : '#FFFFFF') : ui.tabInactive,
                       color: isActive ? (isLight ? '#FFFFFF' : '#000000') : ui.textPrimary,
@@ -2881,7 +2905,7 @@ export default function App() {
                     onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = ui.tabHover; }}
                     onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = ui.tabInactive; }}
                   >
-                    <Icon className="w-[95%] h-[95%]" />
+                    <Icon className="nav-rail__icon w-[95%] h-[95%]" />
                   </button>
                 );
                 return isOpen ? <div key={id}>{btn}</div> : <Tooltip key={id} label={label} side="right">{btn}</Tooltip>;
@@ -2933,6 +2957,7 @@ export default function App() {
                         setGradientPos('bottom');
                         setColorTheme('neon');
                         setCustomTheme(null);
+                        setCustomPickerOpen(false);
                         setShapeCount(9);
                         setShowDashed(true);
                         setShowNoise(true);
@@ -3001,7 +3026,7 @@ export default function App() {
                         return (
                           <button
                             key={key}
-                            onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
+                            onClick={() => { playSwitch(); setCustomTheme(null); setCustomPickerOpen(false); setColorTheme(key); }}
                             className={`flex flex-col items-center justify-center gap-2 px-1 rounded-[16px] transition-colors duration-200 w-[70px] h-[70px] ${isActive
                               ? 'bg-[var(--tab-active)]'
                               : 'bg-transparent hover:bg-[var(--tab-hover)]'
@@ -3283,7 +3308,7 @@ export default function App() {
                     return (
                       <button
                         key={key}
-                        onClick={() => { playSwitch(); setCustomTheme(null); setColorTheme(key); }}
+                        onClick={() => { playSwitch(); setCustomTheme(null); setCustomPickerOpen(false); setColorTheme(key); }}
                         className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${isActive ? 'bg-[var(--tab-active)]' : 'bg-transparent hover:bg-[var(--tab-hover)]'}`}
                         style={{ width: 70, height: 70 }}
                       >
@@ -3295,42 +3320,178 @@ export default function App() {
                     );
                   })}
 
-                  {/* RANDOM THEME — picks a curated brand-inspired palette */}
-                  <button
-                    onClick={() => {
-                      playSwitch();
-                      const base = RANDOM_PALETTES[Math.floor(Math.random() * RANDOM_PALETTES.length)];
-                      const j = jitterPalette(base);
-                      setCustomTheme({
-                        label: j.label,
-                        bg: j.bg,
-                        gradientStart: j.gradientStart,
-                        gradientMid: j.gradientMid,
-                        gradientEnd: j.gradientEnd,
-                        preview: [j.gradientStart, j.gradientMid || j.gradientEnd, j.gradientEnd],
-                      });
+                  {/* Divider — separates curated presets from generative options */}
+                  <div
+                    style={{
+                      height: 1,
+                      width: 40,
+                      alignSelf: 'center',
+                      backgroundColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)',
+                      margin: '2px 0',
                     }}
-                    className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${customTheme ? 'bg-[var(--tab-active)]' : 'bg-transparent hover:bg-[var(--tab-hover)]'}`}
-                    style={{ width: 70, height: 70 }}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex">
-                        {(customTheme ? customTheme.preview : ['#3a3a3a', '#5a5a5a', '#8a8a8a']).map((c, i) => (
-                          <div
-                            key={i}
-                            className="w-3.5 h-3.5 rounded-full"
-                            style={{
-                              backgroundColor: c,
-                              marginLeft: i === 0 ? 0 : -2,
-                              zIndex: 3 - i,
-                              boxShadow: 'none',
-                            }}
+                  />
+
+                  {/* RANDOM THEME — picks a curated brand-inspired palette */}
+                  {(() => {
+                    const randomActive = customTheme && customTheme.label !== 'Custom';
+                    return (
+                      <button
+                        onClick={() => {
+                          playSwitch();
+                          setCustomPickerOpen(false);
+                          const base = RANDOM_PALETTES[Math.floor(Math.random() * RANDOM_PALETTES.length)];
+                          const j = jitterPalette(base);
+                          setCustomTheme({
+                            label: j.label,
+                            bg: j.bg,
+                            gradientStart: j.gradientStart,
+                            gradientMid: j.gradientMid,
+                            gradientEnd: j.gradientEnd,
+                            preview: [j.gradientStart, j.gradientMid || j.gradientEnd, j.gradientEnd],
+                          });
+                        }}
+                        className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${randomActive ? 'bg-[var(--tab-active)]' : 'bg-transparent hover:bg-[var(--tab-hover)]'}`}
+                        style={{ width: 70, height: 70 }}
+                      >
+                        <div className="flex flex-col items-center gap-2">
+                          <PaintBrush
+                            className="w-[18px] h-[18px] transition-colors duration-300"
+                            weight="fill"
+                            style={{ color: randomActive ? 'var(--tab-active-text)' : 'var(--text-subtle)' }}
                           />
-                        ))}
+                          <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${randomActive ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>Random</span>
+                        </div>
+                      </button>
+                    );
+                  })()}
+
+                  {/* CUSTOM THEME — user picks 4 colors (bg + 3 gradient stops) */}
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        playSwitch();
+                        if (!customPickerOpen) {
+                          const src = customTheme || THEMES[colorTheme] || THEMES.neon;
+                          const mid = (a, b) => {
+                            const pa = parseInt(a.slice(1), 16);
+                            const pb = parseInt(b.slice(1), 16);
+                            const r = Math.round((((pa >> 16) & 255) + ((pb >> 16) & 255)) / 2);
+                            const g = Math.round((((pa >> 8) & 255) + ((pb >> 8) & 255)) / 2);
+                            const bl = Math.round(((pa & 255) + (pb & 255)) / 2);
+                            return `#${((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1)}`;
+                          };
+                          applyCustomDraft({
+                            bg: src.bg,
+                            gradientStart: src.gradientStart,
+                            gradientMid: src.gradientMid || mid(src.gradientStart, src.gradientEnd),
+                            gradientEnd: src.gradientEnd,
+                          });
+                        }
+                        setCustomPickerOpen((v) => !v);
+                      }}
+                      className={`group flex flex-col items-center justify-center gap-2 rounded-2xl transition-colors duration-300 ease-out ${customPickerOpen ? 'bg-[var(--tab-active)]' : 'bg-transparent hover:bg-[var(--tab-hover)]'}`}
+                      style={{ width: 70, height: 70 }}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <Plus
+                          className="w-[18px] h-[18px] transition-colors duration-300"
+                          weight="bold"
+                          style={{ color: customPickerOpen ? 'var(--tab-active-text)' : 'var(--text-subtle)' }}
+                        />
+                        <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${customPickerOpen ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>Custom</span>
                       </div>
-                      <span className={`text-[12px] font-medium leading-none transition-colors duration-300 ${customTheme ? 'text-[var(--tab-active-text)]' : 'text-[var(--text-subtle)] group-hover:text-[var(--text-muted)]'}`}>Random</span>
-                    </div>
-                  </button>
+                    </button>
+
+                    {customPickerOpen && (
+                      <div
+                        className="absolute left-full ml-3 top-0 rounded-2xl p-3 flex flex-col gap-3 z-30 custom-color-picker"
+                        style={{ backgroundColor: isLight ? '#EDEDED' : ui.sectionBg, border: 'none', width: 280 }}
+                      >
+                        {/* Swatch row — select which slot to edit */}
+                        <div className="flex items-center gap-2 justify-between">
+                          <span
+                            className="text-[12px] font-medium whitespace-nowrap"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            Color Palette
+                          </span>
+                          <div className="flex items-center gap-2">
+                          {[
+                            { key: 'bg', label: 'Background' },
+                            { key: 'gradientStart', label: 'Start' },
+                            { key: 'gradientMid', label: 'Middle' },
+                            { key: 'gradientEnd', label: 'End' },
+                          ].map(({ key, label }) => {
+                            const active = customSlot === key;
+                            const hex = customDraft[key].replace('#', '');
+                            const r = parseInt(hex.slice(0, 2), 16) || 0;
+                            const g = parseInt(hex.slice(2, 4), 16) || 0;
+                            const b = parseInt(hex.slice(4, 6), 16) || 0;
+                            const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+                            const dotColor = lum > 0.85 ? '#000' : '#fff';
+                            return (
+                              <Tooltip key={key} label={label} side="top">
+                                <button
+                                  onClick={() => setCustomSlot(key)}
+                                  aria-label={label}
+                                  className="rounded-full flex items-center justify-center"
+                                  style={{
+                                    width: 29,
+                                    height: 29,
+                                    backgroundColor: customDraft[key],
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: active ? `inset 0 0 0 2px ${dotColor}` : 'none',
+                                  }}
+                                >
+                                  {active && (
+                                    <span
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 9999,
+                                        backgroundColor: dotColor,
+                                      }}
+                                    />
+                                  )}
+                                </button>
+                              </Tooltip>
+                            );
+                          })}
+                          </div>
+                        </div>
+
+                        {/* Color picker square + hue slider */}
+                        <HexColorPicker
+                          color={customDraft[customSlot]}
+                          onChange={(hex) => applyCustomDraft({ ...customDraft, [customSlot]: hex })}
+                          style={{ width: '100%', height: 160 }}
+                        />
+
+                        {/* Hex input */}
+                        <div
+                          className="flex items-center gap-2 rounded-lg px-2 py-1.5"
+                          style={{ backgroundColor: 'var(--sec-bg)' }}
+                        >
+                          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>#</span>
+                          <input
+                            type="text"
+                            value={customDraft[customSlot].replace('#', '').toUpperCase()}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+                              if (v.length === 6) applyCustomDraft({ ...customDraft, [customSlot]: `#${v}` });
+                              else setCustomDraft({ ...customDraft, [customSlot]: `#${v}` });
+                            }}
+                            className="flex-1 bg-transparent outline-none text-[12px] font-mono uppercase"
+                            style={{ color: 'var(--text-primary)' }}
+                            maxLength={6}
+                            spellCheck={false}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                 </div>
               </div>
             </div>
