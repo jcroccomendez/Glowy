@@ -837,14 +837,23 @@ export default function App() {
   const [imageScale, setImageScale] = useState(1.0);
 
   // Mirror animatedTime → React state so the transport scrubber updates while playing.
+  // Throttled to 10fps + skip-if-unchanged + pause on hidden/blur. Scrubber doesn't
+  // need 30fps; re-rendering App at 30fps spikes CPU.
   useEffect(() => {
     if (!isAnimated) return;
     let raf;
     let last = 0;
+    let lastVal = -1;
     const tick = (now) => {
-      if (now - last >= 33) {
+      if (now - last >= 100) {
         last = now;
-        setPlayheadMs(timeStateRef.current.animatedTime);
+        if (!document.hidden && document.hasFocus()) {
+          const v = timeStateRef.current.animatedTime;
+          if (Math.abs(v - lastVal) >= 1) {
+            lastVal = v;
+            setPlayheadMs(v);
+          }
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -905,6 +914,9 @@ export default function App() {
   const liquidCanvasRef = useRef(null);
   const blurOffscreenRef = useRef(null);
   const blobSpriteRef = useRef({});
+  // Most-recent ready sprite per format. Used as fallback while a new
+  // theme's sprite is still decoding so the blob never blanks on swap.
+  const lastReadySpriteRef = useRef({});
   const dotsCacheRef = useRef(null);
   const wavesBufRef = useRef({ key: '', xs: null, ys: null, staticXs: null, breathFactor: null, numCols: 0, numPoints: 0, stride: 0 });
   const lineGradRef = useRef({ key: '', grad: null });
@@ -1053,15 +1065,24 @@ export default function App() {
     introStartTimeRef.current = -1;
   }, [loaderDone]);
 
-  // Fade-in-up on the canvas wrapper for initial reveal AND tab/theme/format
-  // changes. Does NOT touch play/pause/loop state — purely visual.
+  // Prewarm the blob sprite the moment theme/format changes so its async
+  // Image decode is already in flight by the time the next frame renders.
+  // Cuts the visible color flash on theme swap to ~one frame.
+  useEffect(() => {
+    const theme = customTheme || THEMES[colorTheme] || THEMES.neon;
+    getBlobSprite(theme.gradientStart, theme.gradientEnd, format, theme.gradientMid);
+  }, [colorTheme, customTheme, format]);
+
+  // Fade-in-up on the canvas wrapper for initial reveal AND tab/format
+  // changes. Theme changes intentionally excluded — they update instantly
+  // for fluid color swapping without re-running the entrance animation.
   useEffect(() => {
     const el = fadeWrapRef.current;
     if (!el) return;
     el.classList.remove('canvas-fade-in-up');
     void el.offsetWidth;
     el.classList.add('canvas-fade-in-up');
-  }, [loaderDone, activeTab, format, colorTheme, customTheme]);
+  }, [loaderDone, activeTab, format]);
 
   // Pre-render a blurred linear-gradient ellipse via SVG feGaussianBlur (works
   // on every browser, no canvas ctx.filter dependency). Sprite size matches the
@@ -1106,8 +1127,18 @@ export default function App() {
     const fxCx = cx, fxCy = cy;
     const sprite = getBlobSprite(gradStart, gradEnd, fmt, gradMid);
     if (sprite.ready) {
+      lastReadySpriteRef.current[fmt] = sprite;
       ctx.globalAlpha = fxAlpha;
       ctx.drawImage(sprite.canvas, fxCx - ampRx, fxCy - ampRy, ampRx * 2, ampRy * 2);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    // New sprite still decoding — draw the previous theme's sprite for this
+    // format so the canvas doesn't blank/flash during a theme swap.
+    const fallback = lastReadySpriteRef.current[fmt];
+    if (fallback && fallback.ready) {
+      ctx.globalAlpha = fxAlpha;
+      ctx.drawImage(fallback.canvas, fxCx - ampRx, fxCy - ampRy, ampRx * 2, ampRy * 2);
       ctx.globalAlpha = 1;
       return;
     }
@@ -1771,14 +1802,13 @@ export default function App() {
 
     // Organic movement (increased speed) — uses looped animatedTime so the
     // whole canvas loops every LOOP_MS for cached/encode-friendly playback.
+    // Anim applied regardless of isAnimated so pause freezes current frame
+    // instead of snapping blob back to center.
     const t = (state.animatedTime ?? time) * 0.0005;
-    let animX = 0, animY = 0;
-    if (state.isAnimated) {
-      animX = Math.sin(t * 0.5) * (width * 0.25);
-      animY = Math.cos(t * 0.8) * (height * 0.15);
-      rx += Math.sin(t * 1.2) * (width * 0.15);
-      ry += Math.cos(t * 1.5) * (height * 0.10);
-    }
+    const animX = Math.sin(t * 0.5) * (width * 0.25);
+    const animY = Math.cos(t * 0.8) * (height * 0.15);
+    rx += Math.sin(t * 1.2) * (width * 0.15);
+    ry += Math.cos(t * 1.5) * (height * 0.10);
 
     const waveX = baseBlobX + animX;
     const waveY = baseBlobY + animY;
@@ -2053,8 +2083,15 @@ export default function App() {
     const radius = Math.max(width, height) * 0.6;
     const yOffsetMultiplier = state.format === '16:9' ? 0.50 : 0.30;
     const blobY = state.gradientPos === 'bottom' ? height + (radius * yOffsetMultiplier) : -(radius * yOffsetMultiplier);
-    const rx = radius;
-    const ry = radius;
+    // Apply pattern-tab blob animation at current animatedTime so export
+    // matches the paused preview frame.
+    const patT = timeStateRef.current.animatedTime * 0.0005;
+    const patAnimX = Math.sin(patT * 0.5) * (width * 0.25);
+    const patAnimY = Math.cos(patT * 0.8) * (height * 0.15);
+    const rx = radius + Math.sin(patT * 1.2) * (width * 0.15);
+    const ry = radius + Math.cos(patT * 1.5) * (height * 0.10);
+    const patBlobX = width / 2 + patAnimX;
+    const patBlobY = blobY + patAnimY;
 
     let imageHtml = '';
     if (state.uploadedImageSrc && state.uploadedImageObj) {
@@ -2109,15 +2146,16 @@ export default function App() {
           ${dotsHtml}
         </g>
         ${imageHtml}
-        <ellipse cx="${width / 2}" cy="${blobY}" rx="${rx}" ry="${ry}" fill="url(#blobGrad)" filter="url(#blurFilter)" />
+        <ellipse cx="${patBlobX}" cy="${patBlobY}" rx="${rx}" ry="${ry}" fill="url(#blobGrad)" filter="url(#blurFilter)" />
       `;
     } else if (state.activeTab === 'spectrum') {
       let colsHtml = '';
       const numCols = state.shapeCount || 9;
       const colWidth = width / numCols;
+      const exportTime = timeStateRef.current.animatedTime;
       for (let i = 0; i < numCols; i++) {
         const delayMs = i * 400;
-        const t = 1000 + (delayMs * 0.0015);
+        const t = (exportTime + delayMs) * 0.0015;
 
         let cBlobX = width / 2;
         let cBlobY = blobY;
@@ -2174,7 +2212,7 @@ export default function App() {
       const radiusW = Math.max(width, height) * 0.4;
       const yOffW = state.format === '16:9' ? 0.50 : 0.30;
       const baseBlobYW = state.gradientPos === 'bottom' ? height + (radiusW * yOffW) : -(radiusW * yOffW);
-      const exportTime = 5000;
+      const exportTime = timeStateRef.current.animatedTime;
       const animTW = exportTime * 0.00012;
       const numPointsW = 60;
 
@@ -2245,7 +2283,7 @@ export default function App() {
       const radiusG = Math.max(width, height) * 0.4;
       const yOffG = state.format === '16:9' ? 0.50 : 0.30;
       const baseBlobYG = state.gradientPos === 'bottom' ? height + (radiusG * yOffG) : -(radiusG * yOffG);
-      const exportTime = 5000;
+      const exportTime = timeStateRef.current.animatedTime;
 
       let defsRings = '';
       let groupsRings = '';
@@ -2677,7 +2715,7 @@ export default function App() {
             '--tab-active-text': ui.tabActiveText,
             '--accent': ui.accent,
             '--accent-inverse': ui.accentInverse,
-            '--slider-track': ui.sliderTrack,
+            '--slider-track': ui.sliderTrack, '--slider-bg': ui.sliderBg, '--slider-bg-hover': ui.sliderBgHover, '--slider-fill': ui.sliderFill, '--slider-fill-hover': ui.sliderFillHover, '--slider-tick': ui.sliderTick, '--slider-thumb': ui.sliderThumb, '--slider-thumb-hover': ui.sliderThumbHover,
           }}
         >
 
@@ -2706,7 +2744,7 @@ export default function App() {
                       onClick={() => { playSwitch(); setThemePref(key); }}
                       className="flex items-center justify-center w-7 h-7 rounded-full transition-colors duration-200"
                       style={{
-                        backgroundColor: active ? ui.tabHover : 'transparent',
+                        backgroundColor: active ? ui.tabActive : 'transparent',
                         color: active ? ui.tabActiveText : ui.textSubtle,
                       }}
                       onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = ui.tabHover; }}
@@ -2871,7 +2909,7 @@ export default function App() {
                 '--tab-active-text': ui.tabActiveText,
                 '--accent': ui.accent,
                 '--accent-inverse': ui.accentInverse,
-                '--slider-track': ui.sliderTrack,
+                '--slider-track': ui.sliderTrack, '--slider-bg': ui.sliderBg, '--slider-bg-hover': ui.sliderBgHover, '--slider-fill': ui.sliderFill, '--slider-fill-hover': ui.sliderFillHover, '--slider-tick': ui.sliderTick, '--slider-thumb': ui.sliderThumb, '--slider-thumb-hover': ui.sliderThumbHover,
               }}
             >
               <div className="flex flex-col flex-1 min-h-0">
@@ -2923,7 +2961,7 @@ export default function App() {
 
                   {/* PRESETS SECTION */}
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
-                    <label className="text-[11px] font-medium text-white mb-2 block">Presets</label>
+                    <label className="text-[12px] font-medium text-white mb-2 block">Presets</label>
                     <div className="flex justify-between">
                       {Object.entries(FORMATS).map(([key, { label }]) => {
                         const isActive = format === key;
@@ -2956,7 +2994,7 @@ export default function App() {
 
                   {/* COLOR THEME SECTION */}
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
-                    <label className="text-[11px] font-medium text-white mb-2 block">Color Theme</label>
+                    <label className="text-[12px] font-medium text-white mb-2 block">Color Theme</label>
                     <div className="flex justify-between">
                       {Object.entries(THEMES).map(([key, t]) => {
                         const isActive = colorTheme === key;
@@ -3010,7 +3048,6 @@ export default function App() {
                           onChange={setDotSize}
                           formatValue={(v) => v.toFixed(1) + 'px'}
                         />
-                        <div style={{ height: 8 }}></div>
                         <Slider
                           label="Density"
                           min={10} max={60} step={2}
@@ -3043,7 +3080,6 @@ export default function App() {
                         onChange={setShapeCount}
                         formatValue={(v) => v}
                       />
-                      <div style={{ height: 8 }}></div>
                       <Slider
                         label="Wave Amplitude"
                         min={0} max={2} step={0.05}
@@ -3051,7 +3087,6 @@ export default function App() {
                         onChange={setWaveAmp}
                         formatValue={(v) => v.toFixed(2) + 'x'}
                       />
-                      <div style={{ height: 8 }}></div>
                       <Slider
                         label="Dashed Intensity"
                         min={0} max={2} step={0.05}
@@ -3343,7 +3378,7 @@ export default function App() {
                 '--tab-active-text': ui.tabActiveText,
                 '--accent': ui.accent,
                 '--accent-inverse': ui.accentInverse,
-                '--slider-track': ui.sliderTrack,
+                '--slider-track': ui.sliderTrack, '--slider-bg': ui.sliderBg, '--slider-bg-hover': ui.sliderBgHover, '--slider-fill': ui.sliderFill, '--slider-fill-hover': ui.sliderFillHover, '--slider-tick': ui.sliderTick, '--slider-thumb': ui.sliderThumb, '--slider-thumb-hover': ui.sliderThumbHover,
               }}
             >
               <div className="flex flex-col flex-1 min-h-0">
@@ -3356,7 +3391,7 @@ export default function App() {
                 <div className="panel-scroll flex flex-col overflow-y-auto px-3 pt-1 pb-3 gap-2 flex-1 min-h-0">
 
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3 flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-white">Playback</span>
+                    <span className="text-[12px] font-medium text-white">Playback</span>
                     <div className="flex items-center gap-1">
                     <Tooltip label={playMode === 'once' ? 'Loop off' : 'Loop on'} side="bottom">
                       <button
@@ -3412,9 +3447,6 @@ export default function App() {
                       onChange={setAnimSpeed}
                       formatValue={(v) => v.toFixed(1) + 'x'}
                     />
-                  </div>
-
-                  <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
                     <Slider
                       label="Duration"
                       min={2000} max={20000} step={500}
@@ -3432,7 +3464,7 @@ export default function App() {
                   </div>
 
                   <div className="bg-[var(--sec-bg)] rounded-[16px] p-3">
-                    <label className="text-[11px] font-medium text-white mb-2 block">Easing</label>
+                    <label className="text-[12px] font-medium text-white mb-2 block">Easing</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { id: 'linear', label: 'Linear' },

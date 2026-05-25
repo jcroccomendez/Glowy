@@ -10,7 +10,7 @@
   --sec-bg: #1e1e1e;
   --tab-inactive: #1e1e1e;
   --tab-hover: #252525;
-  --tab-active: #2a2a2a;
+  --tab-active: #2e2e2e;
   --tab-active-text: #ffffff;
   --text-primary: #ffffff;
   --text-muted: #999999;
@@ -19,6 +19,13 @@
   --accent: #ffffff;
   --accent-inverse: #000000;
   --slider-track: #2a2a2a;
+  --slider-bg: #1e1e1e;
+  --slider-bg-hover: #252525;
+  --slider-fill: #2e2e2e;
+  --slider-fill-hover: #2e2e2e;
+  --slider-tick: rgba(255, 255, 255, 0.28);
+  --slider-thumb: #ffffff;
+  --slider-thumb-hover: #cccccc;
   --modal-bg: #181818;
 }
 
@@ -27,7 +34,7 @@
   --panel-bg: #ececec;
   --sec-bg: #f7f7f7;
   --tab-inactive: #ececec;
-  --tab-hover: #e0e0e0;
+  --tab-hover: #e4e4e4;
   --tab-active: #ececec;
   --tab-active-text: #0a0a0b;
   --text-primary: #0a0a0b;
@@ -36,7 +43,14 @@
   --border: rgba(0, 0, 0, 0.06);
   --accent: #000000;
   --accent-inverse: #ffffff;
-  --slider-track: #d9d9d9;
+  --slider-track: #e3e3e3;
+  --slider-bg: #f7f7f7;
+  --slider-bg-hover: #ececec;
+  --slider-fill: #ececec;
+  --slider-fill-hover: #ececec;
+  --slider-tick: rgba(0, 0, 0, 0.2);
+  --slider-thumb: #0a0a0b;
+  --slider-thumb-hover: #3a3a3a;
   --modal-bg: #ffffff;
 }
 
@@ -58,4 +72,119 @@
   --duration-base: 200ms;
   --duration-slow: 320ms;
   --easing: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Glowy pill slider — idle shows clean label/value pill; hover/focus reveals
+ * subtle fill bar, ticks, and vertical-bar thumb. Matches reference design. */
+.glowy-slider {
+  position: relative;
+  width: 100%;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--slider-bg);
+  overflow: hidden;
+  user-select: none;
+  transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glowy-slider:hover { background: var(--slider-bg-hover); }
+
+.glowy-slider__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--slider-fill);
+  pointer-events: none;
+  transition: width 60ms linear, background 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glowy-slider:hover .glowy-slider__fill { background: var(--slider-fill-hover); }
+
+.glowy-slider__ticks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  pointer-events: none;
+  padding: 0 8px;
+  opacity: 0;
+  transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 50%, transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0%, #000 50%, transparent 100%);
+}
+.glowy-slider:hover .glowy-slider__ticks { opacity: 1; }
+.glowy-slider__tick {
+  width: 1px;
+  height: 7px;
+  background: var(--slider-tick);
+  border-radius: 1px;
+}
+
+.glowy-slider__row {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.glowy-slider__label,
+.glowy-slider__value {
+  position: relative;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  pointer-events: none;
+  transition: font-weight 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glowy-slider__label { padding-left: 12px; }
+.glowy-slider__value {
+  padding-right: 12px;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-muted);
+  transition: color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glowy-slider:hover .glowy-slider__value { color: var(--text-primary); }
+
+.glowy-slider__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.glowy-slider__thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--slider-thumb);
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              height 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              width 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              background 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glowy-slider:hover .glowy-slider__thumb {
+  opacity: 1;
+  height: 18px;
+  width: 3px;
+  background: var(--slider-thumb-hover);
+}
+.glowy-slider:has(input:active) .glowy-slider__thumb { opacity: 1; }
+
+/* Dim + shrink thumb when its x position falls behind label or value text. */
+.glowy-slider[data-thumb-over-text]:hover .glowy-slider__thumb { opacity: 0.25; height: 12px; }
+.glowy-slider[data-thumb-over-text]:has(input:active) .glowy-slider__thumb { opacity: 0.45; height: 16px; }
+.glowy-slider:has(input:active) .glowy-slider__thumb {
+  height: 22px;
+  width: 4px;
+  background: var(--slider-thumb);
 }
